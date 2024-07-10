@@ -13,7 +13,7 @@ export default function DashBoard() {
     <Card className="max-w-3xl m-auto my-12">
       <CardHeader>
         <CardTitle>Metenox 采集计算器</CardTitle>
-        <CardDescription>202407110125</CardDescription>
+        <CardDescription>在扫描完成后，点击复制到剪贴板按钮将结果复制到剪贴板后粘贴到下面文本框后点击计算即可计算卫星的周期收益</CardDescription>
       </CardHeader>
 
       <DataProcessForm />

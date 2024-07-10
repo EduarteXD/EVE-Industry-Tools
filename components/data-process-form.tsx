@@ -107,7 +107,7 @@ export default function DataProcessForm() {
     <CardContent>
       <div className='flex gap-2 mb-4 items-center'>
         <div className='text-nowrap'>最低显示价值</div>
-        <Input type="number" value={minBuy} onChange={(e) => setMinBuy(e.target.value)}></Input>
+        <Input type="number" step="100000" value={minBuy} onChange={(e) => setMinBuy(e.target.value)}></Input>
       </div>
       {analyzeData.length ? <>
         {analyzeData.map((row, index) => {
