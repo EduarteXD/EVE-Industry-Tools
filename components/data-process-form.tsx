@@ -17,23 +17,25 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
+interface MoonData {
+  name: string,
+  materials: { [x: number]: number }
+}
+
 export default function DataProcessForm() {
   const [scanData, setScanData] = useState("")
-  const [itemNameMap, setItemNameMap] = useState<{[x: number]: string}>({})
+  const [itemNameMap, setItemNameMap] = useState<{ [x: number]: string }>({})
   const [itemPriceMap, setItemPriceMap] = useState<any>()
   const [analyzeData, setAnalyzeData] = useState<{ name: string, materials: { [x: number]: number } }[]>([])
 
   const calc = () => {
     const rows = scanData.split("\n")
-    const moons = [] as {
-      name: string,
-      materials: { [x: number]: number }
-    }[]
+    const moons = [] as MoonData[]
     const itemsMap = new Map<number, boolean>()
     const currentMoon = {
       name: "",
-      materials: {} as { [x: number]: number }
-    }
+      materials: {}
+    } as MoonData
     for (let i = 1; i < rows.length; i++) {
       if (rows[i].split(" ").length !== 1) {
         if (currentMoon.name) moons.push({ ...currentMoon })
@@ -56,22 +58,24 @@ export default function DataProcessForm() {
     if (currentMoon.name) moons.push({ ...currentMoon })
 
     const items = [] as number[]
-    itemsMap.forEach((_, key) => {items.push(key)})
-      
+    itemsMap.forEach((_, key) => { items.push(key) })
+
     fetch("/api/itemName/batch", { method: 'post', body: JSON.stringify(items) })
       .then(resp => resp.json())
       .then(data => {
         setItemNameMap(data)
       })
 
-    fetch("https://eve.c3q.cc/market/api/", { method: 'post', headers: {
-      'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
-    }, body: new URLSearchParams({
-      queryBuyAssess: JSON.stringify(items),
-      buy_location_id: "[30000142]",
-      querySellAssess: JSON.stringify(items),
-      sell_location_id: "[30000142]"
-    }).toString()})
+    fetch("https://eve.c3q.cc/market/api/", {
+      method: 'post', headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+      }, body: new URLSearchParams({
+        queryBuyAssess: JSON.stringify(items),
+        buy_location_id: "[30000142]",
+        querySellAssess: JSON.stringify(items),
+        sell_location_id: "[30000142]"
+      }).toString()
+    })
       .then(resp => resp.json())
       .then(data => {
         setItemPriceMap(data)
@@ -83,7 +87,7 @@ export default function DataProcessForm() {
     // console.log(moons)
 
 
-    
+
   }
 
   return <>
@@ -119,10 +123,10 @@ export default function DataProcessForm() {
                   </TableRow>
                 })}
                 <TableRow>
-                    <TableCell className="w-[100px]">合计</TableCell>
-                    <TableCell></TableCell>
-                    <TableCell className="text-right">{totSell.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{totBuy.toLocaleString()}</TableCell>
+                  <TableCell className="w-[100px]">合计</TableCell>
+                  <TableCell></TableCell>
+                  <TableCell className="text-right">{totSell.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">{totBuy.toLocaleString()}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
