@@ -10,23 +10,26 @@ import { CardContent, CardFooter } from './ui/card'
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Input } from './ui/input'
 
 interface MoonData {
   name: string,
-  materials: { [x: number]: number }
+  materials: { [x: number]: number },
+  buy: number,
+  sell: number,
 }
 
 export default function DataProcessForm() {
   const [scanData, setScanData] = useState("")
   const [itemNameMap, setItemNameMap] = useState<{ [x: number]: string }>({})
+  const [minBuy, setMinBuy] = useState("1000000")
   const [itemPriceMap, setItemPriceMap] = useState<any>()
-  const [analyzeData, setAnalyzeData] = useState<{ name: string, materials: { [x: number]: number } }[]>([])
+  const [analyzeData, setAnalyzeData] = useState<MoonData[]>([])
 
   const calc = () => {
     const rows = scanData.split("\n")
@@ -80,6 +83,17 @@ export default function DataProcessForm() {
       .then(data => {
         setItemPriceMap(data)
         console.log(data)
+        moons.forEach(moon => {
+          let sell = 0
+          let buy = 0
+          Object.keys(moon.materials).forEach((key) => {
+            sell += moon.materials[parseInt(key)] * itemPriceMap.querySellAssess.result[key].min_price.price
+            buy += moon.materials[parseInt(key)] * itemPriceMap.queryBuyAssess.result[key].max_price.price
+          })
+          moon.buy = buy
+          moon.sell = sell
+        })
+        // console.log(moons)
         setAnalyzeData(moons)
       })
 
@@ -92,19 +106,20 @@ export default function DataProcessForm() {
 
   return <>
     <CardContent>
+      <div className='flex gap-2 mb-4 items-center'>
+        <div className='text-nowrap'>最低显示价值</div>
+        <Input type="number" value={minBuy} onChange={(e) => setMinBuy(e.target.value)}></Input>
+      </div>
       {analyzeData.length ? <>
         {analyzeData.map((row, index) => {
-          let totSell = 0
-          let totBuy = 0
-
-          return <div key={index}>
+          return <div key={index} className={`${row.buy < parseInt(minBuy) || 0 ? 'hidden' : ''}`}>
             <div>
               {row.name}
             </div>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[100px]">产物</TableHead>
+                  <TableHead className="w-[150px]">产物</TableHead>
                   <TableHead>每周期产出</TableHead>
                   <TableHead className="text-right">吉他卖单价格</TableHead>
                   <TableHead className="text-right">吉他收单价格</TableHead>
@@ -112,11 +127,11 @@ export default function DataProcessForm() {
               </TableHeader>
               <TableBody>
                 {Object.keys(row.materials).map((index) => {
-                  totSell += itemPriceMap.querySellAssess.result[index].min_price.price * row.materials[parseInt(index)]
-                  totBuy += itemPriceMap.queryBuyAssess.result[index].max_price.price * row.materials[parseInt(index)]
+                  // totSell += itemPriceMap.querySellAssess.result[index].min_price.price * row.materials[parseInt(index)]
+                  // totBuy += itemPriceMap.queryBuyAssess.result[index].max_price.price * row.materials[parseInt(index)]
 
                   return <TableRow key={index}>
-                    <TableCell className="w-[100px]">{itemNameMap[parseInt(index)]}</TableCell>
+                    <TableCell className="w-[150px]">{itemNameMap[parseInt(index)]}</TableCell>
                     <TableCell>{row.materials[parseInt(index)]}</TableCell>
                     <TableCell className="text-right">{(itemPriceMap.querySellAssess.result[index].min_price.price * row.materials[parseInt(index)]).toLocaleString()}</TableCell>
                     <TableCell className="text-right">{(itemPriceMap.queryBuyAssess.result[index].max_price.price * row.materials[parseInt(index)]).toLocaleString()}</TableCell>
@@ -125,8 +140,8 @@ export default function DataProcessForm() {
                 <TableRow>
                   <TableCell className="w-[100px]">合计</TableCell>
                   <TableCell></TableCell>
-                  <TableCell className="text-right">{totSell.toLocaleString()}</TableCell>
-                  <TableCell className="text-right">{totBuy.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">{row.sell.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">{row.buy.toLocaleString()}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
