@@ -82,13 +82,12 @@ export default function DataProcessForm() {
       .then(resp => resp.json())
       .then(data => {
         setItemPriceMap(data)
-        console.log(data)
         moons.forEach(moon => {
           let sell = 0
           let buy = 0
           Object.keys(moon.materials).forEach((key) => {
-            sell += moon.materials[parseInt(key)] * itemPriceMap.querySellAssess.result[key].min_price.price
-            buy += moon.materials[parseInt(key)] * itemPriceMap.queryBuyAssess.result[key].max_price.price
+            sell += moon.materials[parseInt(key)] * data.querySellAssess.result[key].min_price.price
+            buy += moon.materials[parseInt(key)] * data.queryBuyAssess.result[key].max_price.price
           })
           moon.buy = buy
           moon.sell = sell
@@ -149,7 +148,7 @@ export default function DataProcessForm() {
         })}
       </> : <Textarea
         value={scanData}
-        onChange={(e) => setScanData(e.target.value)}
+        onChange={(e) => setScanData(e.target.value.replaceAll(/<localized hint="[\S]* [\S]* - [\S]* [\S]*">/g, "").replaceAll(/<\/localized>/g, "").replaceAll(/<localized hint="[\S]*">/g, ""))}
         className=' resize-none h-[60vh]'
       />}
     </CardContent>

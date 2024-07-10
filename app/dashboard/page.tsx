@@ -13,6 +13,7 @@ export default function DashBoard() {
     <Card className="max-w-3xl m-auto my-12">
       <CardHeader>
         <CardTitle>Metenox 采集计算器</CardTitle>
+        <CardDescription>202407110125</CardDescription>
       </CardHeader>
 
       <DataProcessForm />
