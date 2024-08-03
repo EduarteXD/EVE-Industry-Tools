@@ -14,7 +14,7 @@ export default function DashBoard() {
       <CardHeader>
         <CardTitle>Calculator for Metenox Moon Drill</CardTitle>
         <CardDescription>
-          After the scan is complete, click the Copy to Clipboard button to copy the result to the clipboard and paste it into the text box below and click Calculate to calculate the moon's periodic gain.
+          After the scan is complete, click the Copy to Clipboard button to copy the result to the clipboard and paste it into the text box below and click Calculate to calculate the moon&apos;s periodic gain.
           <br /><span className="font-bold">The calculation formula for additional output from manual mining is:</span>
           <br />(Average price for the moon ore with a rarity ≥ 16) - miner cost (based on 500/m³) - (Metenox output per process - Average price for the Magmatic Gas consumption per process)
         </CardDescription>
