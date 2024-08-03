@@ -15,10 +15,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh_cn">
+      <head>
+        <GoogleAdsense pId={process.env.ADSENSE_PID || ""} />
+      </head>
       <body>
         <Header />
         {children}
-        <GoogleAdsense pId={process.env.ADSENSE_PID || ""} />
       </body>
     </html>
   );
