@@ -18,10 +18,13 @@ import {
 import { Input } from './ui/input'
 
 interface MoonData {
-  name: string,
-  materials: { [x: number]: number },
-  buy: number,
-  sell: number,
+  volume: number
+  name: string
+  materials: { [x: number]: number }
+  materialsManual: { [x: number]: number }
+  manualPrice: number
+  buy: number
+  sell: number
 }
 
 export default function DataProcessForm() {
@@ -37,7 +40,9 @@ export default function DataProcessForm() {
     const itemsMap = new Map<number, boolean>()
     const currentMoon = {
       name: "",
-      materials: {}
+      materials: {},
+      materialsManual: {},
+      volume: 0
     } as MoonData
     for (let i = 1; i < rows.length; i++) {
       if (rows[i].split(" ").length !== 1) {
@@ -45,22 +50,41 @@ export default function DataProcessForm() {
         // create a new moon
         currentMoon.name = rows[i].replaceAll("\t", "")
         currentMoon.materials = {}
+        currentMoon.materialsManual = {}
+        currentMoon.volume = 0
       } else if (rows[i] !== "") {
         const row = rows[i].split("\t")
-        const quantity = parseFloat(row[2])
-        const id = row[3]
+        const [_, __, quantity, id] = row
+        // const quantity = parseFloat(row[2])
+        // const id = row[3]
 
         const materialsCanBeMined = typeMaterials[id]?.materials.filter((material: { materialTypeID: number }) => material.materialTypeID > 100)
 
+        const oreMap = {
+          4: 45493,
+          8: 45497,
+          16: 45501,
+          32: 45506
+        }
+
+        if (parseInt(id) > oreMap[8]) {
+          currentMoon.volume += Math.floor(30 * parseFloat(quantity)) * 10 * 100
+          typeMaterials[id]?.materials.forEach((materail: { materialTypeID: number, quantity: number }) => {
+            currentMoon.materialsManual[materail.materialTypeID] = (currentMoon.materialsManual[materail.materialTypeID] || 0) + Math.floor(Math.floor(materail.quantity * 30 * parseFloat(quantity)) * 0.96)
+            // itemsMap.set(materail.materialTypeID, true)
+          })
+        }
+
         materialsCanBeMined.forEach((materail: { materialTypeID: number, quantity: number }) => {
-          currentMoon.materials[materail.materialTypeID] = (currentMoon.materials[materail.materialTypeID] || 0) + Math.floor(materail.quantity * 12 * quantity)
+          currentMoon.materials[materail.materialTypeID] = (currentMoon.materials[materail.materialTypeID] || 0) + Math.floor(materail.quantity * 12 * parseFloat(quantity))
           itemsMap.set(materail.materialTypeID, true)
         })
       }
     }
     if (currentMoon.name) moons.push({ ...currentMoon })
 
-    const items = [] as number[]
+    // 默认查询岩浆气的价格
+    const items = [81143]
     itemsMap.forEach((_, key) => { items.push(key) })
 
     fetch("/api/itemName/batch", { method: 'post', body: JSON.stringify(items) })
@@ -85,12 +109,19 @@ export default function DataProcessForm() {
         moons.forEach(moon => {
           let sell = 0
           let buy = 0
+          let manual = 0
           Object.keys(moon.materials).forEach((key) => {
             sell += moon.materials[parseInt(key)] * data.querySellAssess.result[key].min_price.price
             buy += moon.materials[parseInt(key)] * data.queryBuyAssess.result[key].max_price.price
           })
+
+          Object.keys(moon.materialsManual).forEach((key) => {
+            manual += (moon.materialsManual[parseInt(key)] * data.queryBuyAssess.result[key].max_price.price + moon.materialsManual[parseInt(key)] * data.querySellAssess.result[key].min_price.price) / 2
+          })
           moon.buy = buy
           moon.sell = sell
+          moon.manualPrice = manual
+          // console.log(manual)
         })
         // console.log(moons)
         setAnalyzeData(moons)
@@ -106,7 +137,7 @@ export default function DataProcessForm() {
   return <>
     <CardContent>
       <div className='flex gap-2 mb-4 items-center'>
-        <div className='text-nowrap'>最低显示价值</div>
+        <div className='text-nowrap'>Minimum display value</div>
         <Input type="number" step="100000" value={minBuy} onChange={(e) => setMinBuy(e.target.value)}></Input>
       </div>
       {analyzeData.length ? <>
@@ -118,10 +149,16 @@ export default function DataProcessForm() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[150px]">产物</TableHead>
-                  <TableHead>每周期产出</TableHead>
-                  <TableHead className="text-right">吉他卖单价格</TableHead>
-                  <TableHead className="text-right">吉他收单价格</TableHead>
+                  <TableHead className="w-[150px]">material</TableHead>
+                  <TableHead>output amount per process</TableHead>
+                  <TableHead className="text-right">jita sell</TableHead>
+                  <TableHead className="text-right">jita buy</TableHead>
+
+                  <TableHead className="text-right"></TableHead>
+                  
+                  {/* <TableHead className="text-right">手动挖掘容积（≥r16）</TableHead>
+                  <TableHead className="text-right">手动挖掘价值</TableHead>
+                  <TableHead className="text-right">Laverage</TableHead> */}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -134,13 +171,42 @@ export default function DataProcessForm() {
                     <TableCell>{row.materials[parseInt(index)]}</TableCell>
                     <TableCell className="text-right">{(itemPriceMap.querySellAssess.result[index].min_price.price * row.materials[parseInt(index)]).toLocaleString()}</TableCell>
                     <TableCell className="text-right">{(itemPriceMap.queryBuyAssess.result[index].max_price.price * row.materials[parseInt(index)]).toLocaleString()}</TableCell>
+
+                    <TableCell className="text-right"></TableCell>
                   </TableRow>
                 })}
                 <TableRow>
-                  <TableCell className="w-[100px]">合计</TableCell>
+                  <TableCell className="w-[100px]">total</TableCell>
                   <TableCell></TableCell>
                   <TableCell className="text-right">{row.sell.toLocaleString()}</TableCell>
                   <TableCell className="text-right">{row.buy.toLocaleString()}</TableCell>
+
+                  <TableCell className="text-right"></TableCell>
+
+                  {/* <TableCell className="text-right">{row.volume.toLocaleString()}m³</TableCell>
+                  <TableCell className="text-right">{row.manualPrice.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">{(row.manualPrice - row.volume * 500 - (row.sell + row.buy) / 2 + ((itemPriceMap.queryBuyAssess.result[81143].max_price.price + itemPriceMap.querySellAssess.result[81143].min_price.price) / 2) * 55).toLocaleString()}</TableCell> */}
+                </TableRow>
+                <TableRow>
+                  <TableCell className="w-[100px]" colSpan={2}>Manual mining volume(for rarity ≥ 16)</TableCell>
+                  <TableCell className="text-right"></TableCell>
+                  <TableCell className="text-right"></TableCell>
+
+                  <TableCell className="text-right">{row.volume.toLocaleString()}m³</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="w-[100px]" colSpan={2}>Manual mining value</TableCell>
+                  <TableCell className="text-right"></TableCell>
+                  <TableCell className="text-right"></TableCell>
+
+                  <TableCell className="text-right">{row.manualPrice.toLocaleString()}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="w-[100px]" colSpan={2}>Additional output from manual mining</TableCell>
+                  <TableCell className="text-right"></TableCell>
+                  <TableCell className="text-right"></TableCell>
+
+                  <TableCell className="text-right">{(row.manualPrice - row.volume * 500 - (row.sell + row.buy) / 2 + ((itemPriceMap.queryBuyAssess.result[81143].max_price.price + itemPriceMap.querySellAssess.result[81143].min_price.price) / 2) * 55).toLocaleString()}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
@@ -153,8 +219,8 @@ export default function DataProcessForm() {
       />}
     </CardContent>
     <CardFooter>
-      {analyzeData.length ? <Button onClick={() => setAnalyzeData([])}>清除</Button> :
-        <Button onClick={calc}>计算</Button>
+      {analyzeData.length ? <Button onClick={() => setAnalyzeData([])}>Clear</Button> :
+        <Button onClick={calc}>Calculate</Button>
       }
     </CardFooter>
   </>

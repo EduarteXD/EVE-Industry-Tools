@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import GoogleAdsense from "@/components/google-ad-sense";
+import Header from "@/components/header";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -14,8 +15,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh_cn">
-      <body>{children}</body>
-      <GoogleAdsense pId={process.env.ADSENSE_PID || ""} />
+      <body>
+        <Header />
+        {children}
+        <GoogleAdsense pId={process.env.ADSENSE_PID || ""} />
+      </body>
     </html>
   );
 }

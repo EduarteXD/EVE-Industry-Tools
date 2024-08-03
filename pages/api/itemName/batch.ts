@@ -13,7 +13,7 @@ export default function handler(
   const result = {} as {[x: number]: string}
 
   for (let i = 0; i < ids.length; i++) {
-    result[ids[i]] = types[ids[i]].name.zh
+    result[ids[i]] = types[ids[i]].name.en
   }
 
   res.status(200).json(result)
