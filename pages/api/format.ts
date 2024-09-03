@@ -10,20 +10,26 @@ export default function handler(
   const data = JSON.parse(req.body).data
 
   // "Cinnabar(朱砂)：22%，Titanite(榍石)：17%，Monazite(独居石)：27%，Ytterbite(硅铍钇矿)：34% "
-  const rows = data.split("，")
 
-  let result = "卫星	卫星产物	数量	矿石TypeID	恒星系ID	行星ID	卫星ID\nmocked moon"
+  const moons = data.split("\n")
+    
+  let result = "卫星	卫星产物	数量	矿石TypeID	恒星系ID	行星ID	卫星ID"
 
-  for(let i = 0; i < rows.length; i++) {
-    const [_name, _content] = rows[i].split("：")
-    const name = _name.split("(")[1].split(")")[0]
-    const content = parseFloat(_content.split("%")[0]) / 100
+  for (let i = 0; i < moons.length; i++) {
+    const rows = moons[i].split("，")
 
-    const line = `\t${name}\t${content}\t${typeIds[name]}\t0\t0\t0`
+    result = `${result}\nMocked moon ${i}`
 
-    result = `${result}\n${line}`
+    for(let j = 0; j < rows.length; j++) {
+      const [_name, _content] = rows[j].split("：")
+      const name = _name.split("(")[1].split(")")[0]
+      const content = parseFloat(_content.split("%")[0]) / 100
+  
+      const line = `\t${name}\t${content}\t${typeIds[name]}\t0\t0\t0`
+  
+      result = `${result}\n${line}`
+    }
   }
-
 
   // const names = JSON.parse(req.body)
   // console.log(names)
