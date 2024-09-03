@@ -201,7 +201,7 @@ export default function DataProcessForm() {
                   <TableCell className="text-right">{(row.manualPrice - row.volume * 500 - (row.sell + row.buy) / 2 + ((itemPriceMap.queryBuyAssess.result[81143].max_price.price + itemPriceMap.querySellAssess.result[81143].min_price.price) / 2) * 55).toLocaleString()}</TableCell> */}
                 </TableRow>
                 <TableRow>
-                  <TableCell className="w-[100px]" colSpan={2}>Manual mining volume(for rarity ≥ 16)</TableCell>
+                  <TableCell className="w-[100px]" colSpan={2}>Manual mining volume (for rarity ≥ 16)</TableCell>
                   <TableCell className="text-right"></TableCell>
                   <TableCell className="text-right"></TableCell>
 
