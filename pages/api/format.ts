@@ -18,7 +18,7 @@ export default function handler(
   for (let i = 0; i < moons.length; i++) {
     const rows = moons[i].split("，")
 
-    result = `${result}\nMocked moon ${i}`
+    result = `${result}\nMOCK Moon ${i}`
 
     for(let j = 0; j < rows.length; j++) {
       const [_name, _content] = rows[j].split("：")

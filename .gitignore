@@ -9,6 +9,8 @@
 # testing
 /coverage
 
+.zip
+
 # next.js
 /.next/
 /out/
