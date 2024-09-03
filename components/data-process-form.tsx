@@ -34,8 +34,22 @@ export default function DataProcessForm() {
   const [itemPriceMap, setItemPriceMap] = useState<any>()
   const [analyzeData, setAnalyzeData] = useState<MoonData[]>([])
 
-  const calc = () => {
-    const rows = scanData.split("\n")
+  const calc = async () => {
+    let _scanData = scanData
+    await new Promise((res) => {
+      if (_scanData.split("，").length !== 1) {
+        fetch('api/format', { method: 'POST', body: JSON.stringify({
+          data: _scanData
+        }) })
+          .then(resp => resp.json())
+          .then(data => {
+            console.log(data)
+            _scanData = data.result
+          })
+          .finally(() => res(""))
+      } else {res("")}
+    })
+    const rows = _scanData.split("\n")
     const moons = [] as MoonData[]
     const itemsMap = new Map<number, boolean>()
     const currentMoon = {
@@ -70,7 +84,7 @@ export default function DataProcessForm() {
         if (parseInt(id) > oreMap[8]) {
           currentMoon.volume += Math.floor(30 * parseFloat(quantity)) * 10 * 100
           typeMaterials[id]?.materials.forEach((materail: { materialTypeID: number, quantity: number }) => {
-            currentMoon.materialsManual[materail.materialTypeID] = (currentMoon.materialsManual[materail.materialTypeID] || 0) + Math.floor(Math.floor(materail.quantity * 30 * parseFloat(quantity)) * 0.96)
+            currentMoon.materialsManual[materail.materialTypeID] = (currentMoon.materialsManual[materail.materialTypeID] || 0) + Math.floor(Math.floor(materail.quantity * 30 * parseFloat(quantity)) * 0.87)
             // itemsMap.set(materail.materialTypeID, true)
           })
         }
@@ -123,7 +137,6 @@ export default function DataProcessForm() {
           moon.manualPrice = manual
           // console.log(manual)
         })
-        // console.log(moons)
         setAnalyzeData(moons)
       })
 
