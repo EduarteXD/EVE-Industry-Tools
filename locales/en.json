@@ -31,11 +31,15 @@
     "catch": "Catch",
     "metenox": "Metenox",
     "athanor": "Athanor",
+    "skyhook": "Skyhook",
     "addRule": "Add Rule",
     "system": "System",
     "value": "Value",
     "bid": "Bid",
     "status": "Status",
-    "currentCostIndex": "Current Cost Index"
+    "currentCostIndex": "Current Cost Index",
+    "name": "Name",
+    "bidFor": "Bid for",
+    "bidPriceIs": "Bid price is"
   }
 }

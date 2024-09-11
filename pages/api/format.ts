@@ -21,6 +21,11 @@ export default function handler(
 
     result = `${result}\nMOCK Moon ${i}`
 
+    if (moons[i].endsWith("]")) {
+      result = `${result}\nskyhook`
+      continue
+    }
+
     for(let j = 0; j < rows.length; j++) {
       const [_name, _content] = rows[j].split("：")
       const name = _name.split("(")[1].split(")")[0]

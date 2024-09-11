@@ -31,11 +31,15 @@
     "catch": "卡彻",
     "metenox": "自动月矿",
     "athanor": "手动月矿",
+    "skyhook": "天钩",
     "addRule": "添加竞拍规则",
     "system": "星系",
     "value": "价值",
     "bid": "竞价",
     "status": "状态",
-    "currentCostIndex": "当前 Cost Index"
+    "currentCostIndex": "当前 Cost Index",
+    "name": "名称",
+    "bidFor": "出价",
+    "bidPriceIs": "价格为"
   }
 }

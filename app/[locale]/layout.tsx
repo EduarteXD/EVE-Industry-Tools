@@ -4,6 +4,7 @@ import GoogleAdsense from "@/components/google-ad-sense";
 import Header from "@/components/header";
 import {NextIntlClientProvider} from 'next-intl';
 import {getMessages} from 'next-intl/server';
+import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -28,6 +29,7 @@ export default async function RootLayout({
         <NextIntlClientProvider messages={messages}>
           <Header />
           {children}
+          <Toaster />
         </NextIntlClientProvider>
       </body>
     </html>

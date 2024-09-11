@@ -39,6 +39,7 @@ import { z } from 'zod'
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { useTranslations } from 'next-intl'
+import { useToast } from "@/hooks/use-toast"
 
 interface MoonData {
   volume: number
@@ -55,19 +56,22 @@ interface AuctionItem {
   itemName: string
   itemCategory: "自动月矿" | "手动月矿" | "天钩"
   auctionStatus: "拍卖中" | string
-  auctionInfo: "当前无人竞拍" | "当前你是最高出价" | string
+  auctionInfo: string
   regionName: "Catch" | "Querious"
   systemName: string
   itemDetail: string
   startTime: string
   startPrice: string
-  bid: number
 }
 
 interface AuctionRule {
   regionName: "Catch" | "Querious"
   costIndex: number
-  itemCategory: "自动月矿" | "手动月矿"
+  itemCategory: "自动月矿" | "手动月矿" | "天钩"
+}
+
+interface Bids {
+  [x: number]: number
 }
 
 const RulesFormSchema = z.object({
@@ -83,6 +87,14 @@ export default function AuctionForm() {
   const [itemPriceMap, setItemPriceMap] = useState<any>()
   const [analyzeData, setAnalyzeData] = useState<MoonData[]>([])
 
+  const { toast } = useToast()
+
+  const categoryMap = {
+    "天钩": "skyhook",
+    "自动月矿": "metenox",
+    "手动月矿": "athanor"
+  }
+
   const t = useTranslations("auction")
 
   useEffect(() => {
@@ -90,7 +102,7 @@ export default function AuctionForm() {
     setRules(JSON.parse(sessionStorage["rules"] || "[]"))
   }, [])
 
-  useEffect(() => {
+  const refreshPage = () => {
     if (token) {
       fetch("https://tools.dc-eve.com/qq/auction/page", {
         method: "POST", body: JSON.stringify({
@@ -114,6 +126,17 @@ export default function AuctionForm() {
           // console.log(resp.data.data)
         })
     }
+  }
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log(interval)
+      setTimeout(refreshPage, Math.random() * 120)
+    }, 150_000);
+
+    refreshPage();
+
+    return () => clearInterval(interval);
   }, [token])
 
   const matchRule = (auctionItem: AuctionItem) => {
@@ -157,7 +180,7 @@ export default function AuctionForm() {
             currentMoon.materials = {}
             currentMoon.materialsManual = {}
             currentMoon.volume = 0
-          } else if (rows[i] !== "") {
+          } else if (rows[i] !== "" && rows[i] !== "skyhook") {
             const row = rows[i].split("\t")
             const [_, __, quantity, id] = row
             // const quantity = parseFloat(row[2])
@@ -204,9 +227,15 @@ export default function AuctionForm() {
         })
           .then(resp => resp.json())
           .then(data => {
-            console.log(data)
+            // console.log(data)
             setItemPriceMap(data)
-            moons.forEach(moon => {
+            moons.forEach((moon, index) => {
+              if (auctionList[index].itemCategory === "天钩") {
+                moon.buy = parseInt(auctionList[index].itemDetail.split("[")[1].split("]")[0]) * data.queryBuyAssess.result[81143].max_price.price
+                // console.log(moon)
+                return
+              }
+
               let sell = 0
               let buy = 0
               let manual = 0
@@ -223,23 +252,78 @@ export default function AuctionForm() {
               moon.manualPrice = manual
               // console.log(manual)
             })
+
             setAnalyzeData(moons)
+
+            try {
+              console.log(auctionList)
+              auctionList.forEach(async (auctionItem, index) => {
+                const matchedCostIndex = matchRule(auctionItem)
+                const fromStartHrs = Math.ceil((new Date().getTime() - new Date(auctionItem.startTime).getTime()) / 1000 / 3600)
+
+                const bids: Bids = JSON.parse(localStorage["bids"] || "{}")
+        
+                const bid = auctionItem.auctionInfo === "当前无人竞拍" ? parseInt(auctionItem.startPrice.replaceAll(",", "")) + 1 : 
+                  parseInt(auctionItem.auctionInfo.replace("当前第二高拍卖价为", "").replace("当前你的公司是最高出价:", "").replaceAll(",", ""))
+                // console.log(auctionItem.itemDetail)
+                const benefit = (() => {
+                  switch (auctionItem.itemCategory) {
+                    case "天钩":
+                      return moons[index]?.buy
+                    case "手动月矿":
+                      return moons[index]?.manualPrice
+                    case "自动月矿":
+                      return moons[index]?.buy - itemPriceMap.queryBuyAssess.result[81143].max_price.price * 55 - 90000
+                  }
+                })() * 24 * 90
+
+                // console.log(benefit)
+                let price = bid || parseInt(auctionItem.startPrice.replaceAll(",", ""))
+                if (auctionItem.auctionInfo.startsWith("当前第二高拍卖价为")) {
+                  // price += 100_000_000
+                  price = Math.max(bids[auctionItem.id] || 0, price) + 10_000_000
+                }
+
+                console.log(price, bid)
+
+                const costIndex = ((benefit - price) / price)
+
+                const submitBid = (price: number, id: number | string) => {
+                  fetch("https://tools.dc-eve.com/qq/auction/submit", {
+                    method: "POST", body: JSON.stringify({
+                      id,
+                      price
+                    }), headers: {
+                      Authorization: `Bearer ${token}`,
+                      "Content-Type": "application/json",
+                      Cookie: `tools_remember=${token}`
+                    }
+                  })
+                    .then(resp => resp.json())
+                    .then(() => {
+                      refreshPage()
+                    })
+                }
+
+                console.log(benefit, costIndex, matchedCostIndex, auctionItem.itemName, auctionItem.auctionInfo)
+        
+                if (costIndex >= matchedCostIndex && !auctionItem.auctionInfo.startsWith("当前你的公司是最高出价")) {
+                  // console.log("bidding", auctionItem.itemName, "for", price)
+                  toast({
+                    title: `${t("bidFor")} ${auctionItem.itemName}`,
+                    description: `${t("bidPriceIs")} ${price.toLocaleString()}`
+                  })
+
+                  bids[auctionItem.id] = price
+                  localStorage["bids"] = JSON.stringify(bids)
+                  submitBid(price, auctionItem.id)
+                  throw("")
+                }
+              })
+            } catch(_) {}
             // console.log(moons)
           })
       })
-
-
-    auctionList.forEach(auctionItem => {
-      const costIndex = matchRule(auctionItem)
-      const fromStartHrs = Math.ceil((new Date().getTime() - new Date(auctionItem.startTime).getTime()) / 1000 / 3600)
-
-      
-    })
-
-    // const interval = setInterval(() => {
-
-    // }, 1000);
-    // return () => clearInterval(interval);
   }, [auctionList])
 
   const rulesForm = useForm<z.infer<typeof RulesFormSchema>>({
@@ -269,7 +353,7 @@ export default function AuctionForm() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[150px]">{t("ruleId")}</TableHead>
+              <TableHead className="w-[120px]">{t("ruleId")}</TableHead>
               <TableHead>{t("category")}</TableHead>
               <TableHead className="text-right">{t("region")}</TableHead>
               <TableHead className="text-right">{t("costIndex")}</TableHead>
@@ -281,13 +365,14 @@ export default function AuctionForm() {
               rules.map((rule, index) => {
 
                 return <TableRow key={index}>
-                  <TableCell className="w-[150px]">{index}</TableCell>
-                  <TableCell>{rule.itemCategory}</TableCell>
+                  <TableCell className="w-[120px]">{index}</TableCell>
+                  <TableCell>{t(categoryMap[rule.itemCategory])}</TableCell>
                   <TableCell className="text-right">{rule.regionName}</TableCell>
                   <TableCell className="text-right">{rule.costIndex}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" onClick={() => {
                       setRules(rules.filter(_rule => _rule !== rule))
+                      sessionStorage["rules"] = JSON.stringify(rules.filter(_rule => _rule !== rule))
                     }}>
                       <Trash2 className='w-4 h-4' />
                     </Button>
@@ -328,6 +413,7 @@ export default function AuctionForm() {
                       <SelectLabel>{t("category")}</SelectLabel>
                       <SelectItem value="自动月矿">{t("metenox")}</SelectItem>
                       <SelectItem value="手动月矿">{t("athanor")}</SelectItem>
+                      <SelectItem value="天钩">{t("skyhook")}</SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>)}
@@ -349,12 +435,13 @@ export default function AuctionForm() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[150px]">{t("category")}</TableHead>
+              <TableHead>{t("category")}</TableHead>
               <TableHead>{t("region")}</TableHead>
-              <TableHead className="text-right">{t("system")}</TableHead>
-              <TableHead className="text-right">{t("value")}</TableHead>
+              <TableHead>{t("system")}</TableHead>
+              <TableHead>{t("value")}</TableHead>
+              <TableHead>{t("name")}</TableHead>
               <TableHead className="text-right">{t("currentCostIndex")}</TableHead>
-              <TableHead className="text-right">{t("bid")}</TableHead>
+              {/* <TableHead className="text-right">{t("bid")}</TableHead> */}
               <TableHead className="text-right">{t("status")}</TableHead>
             </TableRow>
           </TableHeader>
@@ -363,25 +450,39 @@ export default function AuctionForm() {
               // auctionList.map((item, index) => {
               auctionList
                 .filter(item => item.auctionStatus !== "已结束")
-                .filter(item => item.itemCategory === "手动月矿" || item.itemCategory === "自动月矿")
+                .filter(item => item.itemCategory === "手动月矿" || item.itemCategory === "自动月矿" || item.itemCategory === "天钩")
                 .map((item, index) => {
-                  const benefit = (item.itemCategory === "手动月矿" ? analyzeData[index]?.manualPrice : (analyzeData[index]?.buy - itemPriceMap.queryBuyAssess.result[81143].max_price.price * 55 - 90000)) * 24 * 90
-                  const price = item.bid || parseInt(item.startPrice.replaceAll(",", ""))
+                  // const benefit = item.itemCategory === "手动月矿" ? (analyzeData[index]?.manualPrice || : (item.itemCategory === "天钩" ? (analyzeData[index]?.buy - itemPriceMap.queryBuyAssess.result[81143].max_price.price * 55 - 90000) : 0 )) * 24 * 90
+                  const bid = item.auctionInfo === "当前无人竞拍" ? parseInt(item.startPrice.replaceAll(",", "")) + 1 : 
+                    parseInt(item.auctionInfo.replace("当前第二高拍卖价为", "").replace("当前你的公司是最高出价:", "").replaceAll(",", ""))
+                  // console.log(itemPriceMap)
+                  const benefit = (() => {
+                    switch (item.itemCategory) {
+                      case "天钩":
+                        return analyzeData[index]?.buy
+                      case "手动月矿":
+                        return analyzeData[index]?.manualPrice
+                      case "自动月矿":
+                        return analyzeData[index]?.buy - itemPriceMap.queryBuyAssess.result[81143].max_price.price * 55 - 90000
+                    }
+                  })() * 24 * 90
+                  const price = bid || parseInt(item.startPrice.replaceAll(",", ""))
                   const costIndex = ((benefit - price) / price)
                   const matchedCi = matchRule(item)
 
-                  return benefit ? <TableRow key={index}>
-                    <TableCell className="w-[150px]">{item.itemCategory}</TableCell>
-                    <TableCell>{item.regionName}</TableCell>
-                    <TableCell className="text-right">{item.systemName}</TableCell>
-                    <TableCell className="text-right">{benefit.toLocaleString()}</TableCell>
+                  return <TableRow key={index}>
+                    <TableCell>{t(categoryMap[item.itemCategory])}</TableCell>
+                    <TableCell>{t(item.regionName.toLocaleLowerCase())}</TableCell>
+                    <TableCell>{item.systemName}</TableCell>
+                    <TableCell>{benefit.toLocaleString()}</TableCell>
+                    <TableCell>{item.itemName}</TableCell>
                     <TableCell className="text-right" style={{
                       color: matchedCi > costIndex ? "red" : "green"
                     }}>{`${costIndex.toFixed(2)}${matchedCi > costIndex ? "" : ` / ${matchedCi}`}`}</TableCell>
-                    <TableCell className="text-right">{price.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{item.auctionStatus}</TableCell>
-                  </TableRow> : <></>
-              })}
+                    {/* <TableCell className="text-right">{price.toLocaleString()}</TableCell> */}
+                    <TableCell className="text-right">{item.auctionInfo}</TableCell>
+                  </TableRow>
+                })}
           </TableBody>
         </Table>
       </div> : <Textarea
