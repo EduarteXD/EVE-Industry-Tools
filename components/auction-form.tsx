@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 // @ts-ignore
 import typeMaterials from './typeMaterials.yml'
 
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from './ui/button'
-import { CardContent, CardFooter } from './ui/card'
+import { CardContent } from './ui/card'
 import {
   Table,
   TableBody,
@@ -16,7 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Input } from './ui/input'
-import { Delete, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -29,10 +29,8 @@ import {
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
-  FormLabel,
   FormMessage,
 } from "@/components/ui/form"
 import { z } from 'zod'
@@ -90,8 +88,6 @@ export default function AuctionForm() {
   const [token, setToken] = useState("")
   const [auctionList, setAuctionList] = useState<AuctionItem[]>([])
   const [rules, setRules] = useState<AuctionRule[]>([])
-  const [itemPriceMap, setItemPriceMap] = useState<any>()
-  const [analyzeData, setAnalyzeData] = useState<ItemData[]>([])
 
   const { toast } = useToast()
 
@@ -107,6 +103,17 @@ export default function AuctionForm() {
     setToken(sessionStorage["token"] || "")
     setRules(JSON.parse(sessionStorage["rules"] || "[]"))
   }, [])
+
+  const matchRule = (auctionItem: AuctionItem) => {
+    let costIndex = Infinity
+    rules.forEach((rule) => {
+      if (auctionItem.itemCategory !== rule.itemCategory) return
+      if (auctionItem.regionName !== rule.regionName) return
+      costIndex = Math.min(costIndex, rule.costIndex)
+    })
+
+    return costIndex
+  }
 
   const getAuctionList = async () => {
     if (!token) return
@@ -297,7 +304,10 @@ export default function AuctionForm() {
               Cookie: `tools_remember=${token}`
             }
           })
+
+          console.warn("++++ bidded", item.itemName, "in region", item.regionName, "cost index", item.costIndex, "/", item.matchedCi)
         } catch (e) {
+          console.error("---- failed to bid", item.itemName, "in region", item.regionName, "cost index", item.costIndex, "/", item.matchedCi)
           toast({
             title: t("networkError"),
             description: String(e)
@@ -308,17 +318,6 @@ export default function AuctionForm() {
       }
     })
   }, [auctionList])
-
-  const matchRule = (auctionItem: AuctionItem) => {
-    let costIndex = Infinity
-    rules.forEach((rule) => {
-      if (auctionItem.itemCategory !== rule.itemCategory) return
-      if (auctionItem.regionName !== rule.regionName) return
-      costIndex = Math.min(costIndex, rule.costIndex)
-    })
-
-    return costIndex
-  }
 
   const rulesForm = useForm<z.infer<typeof RulesFormSchema>>({
     resolver: zodResolver(RulesFormSchema),
@@ -339,10 +338,6 @@ export default function AuctionForm() {
 
   return <>
     <CardContent>
-      {/* <div className='flex gap-2 mb-4 items-center'>
-        <div className='text-nowrap'>Minimum display value</div>
-        <Input type="number" step="100000" value={minBuy} onChange={(e) => setMinBuy(e.target.value)}></Input>
-      </div> */}
       {token ? <div className='flex flex-col gap-2'>
         <Table>
           <TableHeader>
@@ -437,6 +432,7 @@ export default function AuctionForm() {
               <TableHead className="text-right">{t("currentCostIndex")}</TableHead>
               {/* <TableHead className="text-right">{t("bid")}</TableHead> */}
               <TableHead className="text-right">{t("status")}</TableHead>
+              <TableHead className="text-right">{t("timeLeft")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -455,6 +451,7 @@ export default function AuctionForm() {
                       color: item.matchedCi > item.costIndex ? "red" : "green"
                     }}>{`${item.costIndex.toFixed(2)}${item.matchedCi > item.costIndex ? "" : ` / ${item.matchedCi}`}`}</TableCell>
                     <TableCell className="text-right">{item.auctionInfo}</TableCell>
+                    <TableCell className="text-right">{24 * 4 + 12 - item.fromStartHrs} (±12) h</TableCell>
                   </TableRow>
                 })}
           </TableBody>

@@ -41,6 +41,7 @@
     "name": "Name",
     "bidFor": "Bid for",
     "bidPriceIs": "Bid price is",
-    "networkError": "Network Error"
+    "networkError": "Network Error",
+    "timeLeft": "Time left"
   }
 }
