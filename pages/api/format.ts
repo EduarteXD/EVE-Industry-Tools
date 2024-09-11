@@ -16,6 +16,7 @@ export default function handler(
   let result = "卫星	卫星产物	数量	矿石TypeID	恒星系ID	行星ID	卫星ID"
 
   for (let i = 0; i < moons.length; i++) {
+    if (moons[i] === "") continue
     const rows = moons[i].split("，")
 
     result = `${result}\nMOCK Moon ${i}`

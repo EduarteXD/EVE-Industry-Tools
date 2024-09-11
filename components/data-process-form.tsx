@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Input } from './ui/input'
+import { useTranslations } from 'next-intl'
 
 interface MoonData {
   volume: number
@@ -34,11 +35,13 @@ export default function DataProcessForm() {
   const [itemPriceMap, setItemPriceMap] = useState<any>()
   const [analyzeData, setAnalyzeData] = useState<MoonData[]>([])
 
+  const t = useTranslations("metenox")
+
   const calc = async () => {
     let _scanData = scanData
     await new Promise((res) => {
       if (_scanData.split("，").length !== 1) {
-        fetch('api/format', { method: 'POST', body: JSON.stringify({
+        fetch('/api/format', { method: 'POST', body: JSON.stringify({
           data: _scanData
         }) })
           .then(resp => resp.json())
@@ -101,7 +104,7 @@ export default function DataProcessForm() {
     const items = [81143]
     itemsMap.forEach((_, key) => { items.push(key) })
 
-    fetch("/api/itemName/batch", { method: 'post', body: JSON.stringify(items) })
+    fetch("/api/itemName/batch", { method: 'post', body: JSON.stringify({ ids: items, locale: location.pathname.split("/")[1] }) })
       .then(resp => resp.json())
       .then(data => {
         setItemNameMap(data)
@@ -150,7 +153,7 @@ export default function DataProcessForm() {
   return <>
     <CardContent>
       <div className='flex gap-2 mb-4 items-center'>
-        <div className='text-nowrap'>Minimum display value</div>
+        <div className='text-nowrap'>{t("minimumDisplay")}</div>
         <Input type="number" step="100000" value={minBuy} onChange={(e) => setMinBuy(e.target.value)}></Input>
       </div>
       {analyzeData.length ? <>
@@ -162,10 +165,10 @@ export default function DataProcessForm() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[150px]">material</TableHead>
-                  <TableHead>output amount per process</TableHead>
-                  <TableHead className="text-right">jita sell</TableHead>
-                  <TableHead className="text-right">jita buy</TableHead>
+                  <TableHead className="w-[150px]">{t("material")}</TableHead>
+                  <TableHead>{t("outputAmount")}</TableHead>
+                  <TableHead className="text-right">{t("jitaSell")}</TableHead>
+                  <TableHead className="text-right">{t("jitaBuy")}</TableHead>
 
                   <TableHead className="text-right"></TableHead>
                   
@@ -189,7 +192,7 @@ export default function DataProcessForm() {
                   </TableRow>
                 })}
                 <TableRow>
-                  <TableCell className="w-[100px]">total</TableCell>
+                  <TableCell className="w-[100px]">{t("total")}</TableCell>
                   <TableCell></TableCell>
                   <TableCell className="text-right">{row.sell.toLocaleString()}</TableCell>
                   <TableCell className="text-right">{row.buy.toLocaleString()}</TableCell>
@@ -201,21 +204,21 @@ export default function DataProcessForm() {
                   <TableCell className="text-right">{(row.manualPrice - row.volume * 500 - (row.sell + row.buy) / 2 + ((itemPriceMap.queryBuyAssess.result[81143].max_price.price + itemPriceMap.querySellAssess.result[81143].min_price.price) / 2) * 55).toLocaleString()}</TableCell> */}
                 </TableRow>
                 <TableRow>
-                  <TableCell className="w-[100px]" colSpan={2}>Manual mining volume (for rarity ≥ 16)</TableCell>
+                  <TableCell className="w-[100px]" colSpan={2}>{t("manualMiningVolume")}</TableCell>
                   <TableCell className="text-right"></TableCell>
                   <TableCell className="text-right"></TableCell>
 
                   <TableCell className="text-right">{row.volume.toLocaleString()}m³</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell className="w-[100px]" colSpan={2}>Manual mining value</TableCell>
+                  <TableCell className="w-[100px]" colSpan={2}>{t("manualMiningValue")}</TableCell>
                   <TableCell className="text-right"></TableCell>
                   <TableCell className="text-right"></TableCell>
 
                   <TableCell className="text-right">{row.manualPrice.toLocaleString()}</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell className="w-[100px]" colSpan={2}>Additional output from manual mining</TableCell>
+                  <TableCell className="w-[100px]" colSpan={2}>{t("manualMiningAdditional")}</TableCell>
                   <TableCell className="text-right"></TableCell>
                   <TableCell className="text-right"></TableCell>
 
@@ -232,8 +235,8 @@ export default function DataProcessForm() {
       />}
     </CardContent>
     <CardFooter>
-      {analyzeData.length ? <Button onClick={() => setAnalyzeData([])}>Clear</Button> :
-        <Button onClick={calc}>Calculate</Button>
+      {analyzeData.length ? <Button onClick={() => setAnalyzeData([])}>{t("clear")}</Button> :
+        <Button onClick={calc}>{t("calculate")}</Button>
       }
     </CardFooter>
   </>

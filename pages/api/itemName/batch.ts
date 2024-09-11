@@ -7,13 +7,13 @@ export default function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const ids = JSON.parse(req.body)
-  console.log(ids)
+  const ids = JSON.parse(req.body).ids
+  const locale = JSON.parse(req.body).locale || "en"
 
   const result = {} as {[x: number]: string}
 
   for (let i = 0; i < ids.length; i++) {
-    result[ids[i]] = types[ids[i]].name.en
+    result[ids[i]] = types[ids[i]].name[locale]
   }
 
   res.status(200).json(result)

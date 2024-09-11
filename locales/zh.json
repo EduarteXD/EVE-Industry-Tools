@@ -1,0 +1,41 @@
+{
+  "metenox": {
+    "title": "Metenox 开采计算器",
+    "guide": "扫描完成后，点击复制到剪贴板按钮，粘贴结果到下方的文本框中，点击计算，即可计算出卫星的周期产出",
+    "formulaTip": "人工挖矿额外产出计算公式为：",
+    "formula": "(稀有度≥16的月球矿石的平均价格)-矿工成本(基于500/m³)-(每流程的元素产出价格-每流程的岩浆气消耗平均价格)",
+    "minimumDisplay": "最低展示价值",
+    "calculate": "计算",
+    "clear": "清除",
+    "material": "元素",
+    "outputAmount": "每流程产出数量",
+    "jitaSell": "吉他卖单",
+    "jitaBuy": "吉他收单",
+    "total": "合计",
+    "manualMiningVolume": "可手动采集矿物体积 (稀有度≥16)",
+    "manualMiningValue": "可手动采集矿物价值",
+    "manualMiningAdditional": "手动采集额外收益"
+  },
+  "auction": {
+    "title": "拍卖工具",
+    "tokenTip": "请粘贴token",
+    "ruleId": "规则ID",
+    "category": "适用类型",
+    "region": "星域",
+    "costIndex": "Cost Index",
+    "operation": "操作",
+    "regionTip": "请选择适用星域",
+    "categoryTip": "请选择适用类型",
+    "minCostIndex": "最小 Cost Index",
+    "querious": "逑瑞斯",
+    "catch": "卡彻",
+    "metenox": "自动月矿",
+    "athanor": "手动月矿",
+    "addRule": "添加竞拍规则",
+    "system": "星系",
+    "value": "价值",
+    "bid": "竞价",
+    "status": "状态",
+    "currentCostIndex": "当前 Cost Index"
+  }
+}

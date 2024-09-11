@@ -1,0 +1,41 @@
+{
+  "metenox": {
+    "title": "Calculator for Metenox Moon Drill",
+    "guide": "After the scan is complete, click the Copy to Clipboard button to copy the result to the clipboard and paste it into the text box below and click Calculate to calculate the moon's periodic gain.",
+    "formulaTip": "The calculation formula for additional output from manual mining is:",
+    "formula": "(Average price for the moon ore with a rarity ≥ 16) - miner cost (based on 500/m³) - (Metenox output per process - Average price for the Magmatic Gas consumption per process)",
+    "minimumDisplay": "Minimum display value",
+    "calculate": "Calculate",
+    "clear": "Clear",
+    "material": "Material",
+    "outputAmount": "Output amount per process",
+    "jitaSell": "Jita sell",
+    "jitaBuy": "Jita buy",
+    "total": "total",
+    "manualMiningVolume": "Manual mining volume (for rarity ≥ 16)",
+    "manualMiningValue": "Manual mining value",
+    "manualMiningAdditional": "Additional output from manual mining"
+  },
+  "auction": {
+    "title": "Auction tool",
+    "tokenTip": "Please paste your token here",
+    "ruleId": "Rule ID",
+    "category": "Category",
+    "region": "Region",
+    "costIndex": "Cost Index",
+    "operation": "Operation",
+    "regionTip": "Select region",
+    "categoryTip": "Select category",
+    "minCostIndex": "Minimum Cost Index",
+    "querious": "Querious",
+    "catch": "Catch",
+    "metenox": "Metenox",
+    "athanor": "Athanor",
+    "addRule": "Add Rule",
+    "system": "System",
+    "value": "Value",
+    "bid": "Bid",
+    "status": "Status",
+    "currentCostIndex": "Current Cost Index"
+  }
+}
