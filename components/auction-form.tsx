@@ -16,7 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Input } from './ui/input'
-import { Trash2 } from 'lucide-react'
+import { Loader, LoaderCircle, Trash2 } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -437,23 +437,29 @@ export default function AuctionForm() {
           </TableHeader>
           <TableBody>
             {
-              // auctionList.map((item, index) => {
-              auctionList
-                .filter(item => item.auctionStatus !== "已结束")
-                .map((item, index) => {
-                  return <TableRow key={index}>
-                    <TableCell>{t(categoryMap[item.itemCategory])}</TableCell>
-                    <TableCell>{t(item.regionName.toLocaleLowerCase())}</TableCell>
-                    <TableCell>{item.systemName}</TableCell>
-                    <TableCell>{item.value.toLocaleString()}</TableCell>
-                    <TableCell>{item.itemName}</TableCell>
-                    <TableCell className="text-right" style={{
-                      color: item.matchedCi > item.costIndex ? "red" : "green"
-                    }}>{`${item.costIndex.toFixed(2)}${item.matchedCi > item.costIndex ? "" : ` / ${item.matchedCi}`}`}</TableCell>
-                    <TableCell className="text-right">{item.auctionInfo}</TableCell>
-                    <TableCell className="text-right">{24 * 4 + 12 - item.fromStartHrs} (±12) h</TableCell>
-                  </TableRow>
-                })}
+              auctionList.length ?
+                auctionList
+                  .filter(item => item.auctionStatus !== "已结束")
+                  .map((item, index) => {
+                    return <TableRow key={index}>
+                      <TableCell>{t(categoryMap[item.itemCategory])}</TableCell>
+                      <TableCell>{t(item.regionName.toLocaleLowerCase())}</TableCell>
+                      <TableCell>{item.systemName}</TableCell>
+                      <TableCell>{item.value.toLocaleString()}</TableCell>
+                      <TableCell>{item.itemName}</TableCell>
+                      <TableCell className="text-right" style={{
+                        color: item.matchedCi > item.costIndex ? "red" : "green"
+                      }}>{`${item.costIndex.toFixed(2)}${item.matchedCi > item.costIndex ? "" : ` / ${item.matchedCi}`}`}</TableCell>
+                      <TableCell className="text-right">{item.auctionInfo}</TableCell>
+                      <TableCell className="text-right">{24 * 4 + 12 - item.fromStartHrs} (±12) h</TableCell>
+                    </TableRow>
+                }) :
+                <TableRow>
+                  <TableCell colSpan={8}>
+                    <LoaderCircle className='m-auto animate-spin w-4 h-4 my-4' stroke='gray' />
+                  </TableCell>
+                </TableRow>
+            }
           </TableBody>
         </Table>
       </div> : <Textarea
