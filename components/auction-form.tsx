@@ -41,7 +41,7 @@ import { useForm } from "react-hook-form"
 import { useTranslations } from 'next-intl'
 import { useToast } from "@/hooks/use-toast"
 
-interface MoonData {
+interface ItemData {
   volume: number
   name: string
   materials: { [x: number]: number }
@@ -62,6 +62,12 @@ interface AuctionItem {
   itemDetail: string
   startTime: string
   startPrice: string
+
+  costIndex: number
+  value: number
+  matchedCi: number
+  fromStartHrs: number
+  price: number
 }
 
 interface AuctionRule {
@@ -85,7 +91,7 @@ export default function AuctionForm() {
   const [auctionList, setAuctionList] = useState<AuctionItem[]>([])
   const [rules, setRules] = useState<AuctionRule[]>([])
   const [itemPriceMap, setItemPriceMap] = useState<any>()
-  const [analyzeData, setAnalyzeData] = useState<MoonData[]>([])
+  const [analyzeData, setAnalyzeData] = useState<ItemData[]>([])
 
   const { toast } = useToast()
 
@@ -102,10 +108,12 @@ export default function AuctionForm() {
     setRules(JSON.parse(sessionStorage["rules"] || "[]"))
   }, [])
 
-  const refreshPage = () => {
-    if (token) {
-      fetch("https://tools.dc-eve.com/qq/auction/page", {
-        method: "POST", body: JSON.stringify({
+  const getAuctionList = async () => {
+    if (!token) return
+    try {
+      const rawAuctionList: AuctionItem[] = (await (await fetch("https://tools.dc-eve.com/qq/auction/page", {
+        method: "POST",
+        body: JSON.stringify({
           itemName: "",
           systemId: [],
           constellationId: [],
@@ -114,30 +122,192 @@ export default function AuctionForm() {
           category: [],
           page: 1,
           size: 999
-        }), headers: {
+        }),
+        headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
           Cookie: `tools_remember=${token}`
         }
-      })
-        .then(resp => resp.json())
-        .then(resp => {
-          setAuctionList(resp.data.data)
-          // console.log(resp.data.data)
+      })).json()).data.data
+
+      const rawItems = rawAuctionList.reduce((a, c) => {
+        return `${a}\n${c.itemDetail}`
+      }, "")
+
+      const formatedItems = await (await fetch('/api/format', {
+        method: 'POST', body: JSON.stringify({
+          data: rawItems
         })
+      })).json()
+
+      const rows = formatedItems.result.split("\n")
+      const items = [] as ItemData[]
+      const marketItemsMap = new Map<number, boolean>()
+      const current = {
+        name: "",
+        materials: {},
+        materialsManual: {},
+        volume: 0
+      } as ItemData
+      for (let i = 1; i < rows.length; i++) {
+        if (rows[i].split(" ").length !== 1) {
+          if (current.name) items.push({ ...current })
+          current.name = rows[i].replaceAll("\t", "")
+          current.materials = {}
+          current.materialsManual = {}
+          current.volume = 0
+        } else if (rows[i] !== "" && rows[i] !== "skyhook") {
+          const row = rows[i].split("\t")
+          const [_, __, quantity, id] = row
+
+          const materialsCanBeMined = typeMaterials[id]?.materials.filter((material: { materialTypeID: number }) => material.materialTypeID > 100)
+
+          const oreMap = {
+            4: 45493,
+            8: 45497,
+            16: 45501,
+            32: 45506
+          }
+
+          if (parseInt(id) > oreMap[8]) {
+            current.volume += Math.floor(30 * parseFloat(quantity)) * 10 * 100
+            typeMaterials[id]?.materials.forEach((materail: { materialTypeID: number, quantity: number }) => {
+              current.materialsManual[materail.materialTypeID] = (current.materialsManual[materail.materialTypeID] || 0) + Math.floor(Math.floor(materail.quantity * 30 * parseFloat(quantity)) * 0.87)
+            })
+          }
+
+          materialsCanBeMined.forEach((materail: { materialTypeID: number, quantity: number }) => {
+            current.materials[materail.materialTypeID] = (current.materials[materail.materialTypeID] || 0) + Math.floor(materail.quantity * 12 * parseFloat(quantity))
+            marketItemsMap.set(materail.materialTypeID, true)
+          })
+        }
+      }
+
+      if (current.name) items.push({ ...current })
+
+      const marketItems = [81143]
+      marketItemsMap.forEach((_, key) => { marketItems.push(key) })
+
+      const marketData = await (await fetch("https://eve.c3q.cc/market/api/", {
+        method: 'post', headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+        }, body: new URLSearchParams({
+          queryBuyAssess: JSON.stringify(marketItems),
+          buy_location_id: "[30000142]",
+          querySellAssess: JSON.stringify(marketItems),
+          sell_location_id: "[30000142]"
+        }).toString()
+      })).json()
+
+      items.forEach((item, index) => {
+        if (rawAuctionList[index].itemCategory === "天钩") {
+          item.buy = parseInt(rawAuctionList[index].itemDetail.split("[")[1].split("]")[0]) * marketData.queryBuyAssess.result[81143].max_price.price
+          return
+        }
+
+        let sell = 0
+        let buy = 0
+        let manual = 0
+        Object.keys(item.materials).forEach((key) => {
+          sell += item.materials[parseInt(key)] * marketData.querySellAssess.result[key].min_price.price
+          buy += item.materials[parseInt(key)] * marketData.queryBuyAssess.result[key].max_price.price
+        })
+
+        Object.keys(item.materialsManual).forEach((key) => {
+          manual += (item.materialsManual[parseInt(key)] * marketData.queryBuyAssess.result[key].max_price.price + item.materialsManual[parseInt(key)] * marketData.querySellAssess.result[key].min_price.price) / 2
+        })
+
+        item.buy = buy
+        item.sell = sell
+        item.manualPrice = manual
+      })
+
+      rawAuctionList.forEach((auctionItem, index) => {
+        const matchedCostIndex = matchRule(auctionItem)
+        const fromStartHrs = Math.ceil((new Date().getTime() - new Date(auctionItem.startTime).getTime()) / 1000 / 3600)
+
+        const bids: Bids = JSON.parse(localStorage["bids"] || "{}")
+
+        const bid = auctionItem.auctionInfo === "当前无人竞拍" ? parseInt(auctionItem.startPrice.replaceAll(",", "")) + 1 :
+          parseInt(auctionItem.auctionInfo.replace("当前第二高拍卖价为", "").replace("当前你的公司是最高出价:", "").replaceAll(",", ""))
+        const benefit = (() => {
+          switch (auctionItem.itemCategory) {
+            case "天钩":
+              return items[index].buy
+            case "手动月矿":
+              return items[index].manualPrice
+            case "自动月矿":
+              return items[index].buy - marketData.queryBuyAssess.result[81143].max_price.price * 55 - 90000
+          }
+        })() * 24 * 90
+
+        let price = bid || parseInt(auctionItem.startPrice.replaceAll(",", ""))
+        if (auctionItem.auctionInfo.startsWith("当前第二高拍卖价为")) {
+          price = Math.max(bids[auctionItem.id] || 0, price) + 10_000_000
+        }
+
+        auctionItem.costIndex = ((benefit - price) / price)
+        auctionItem.value = benefit
+        auctionItem.matchedCi = matchedCostIndex
+        auctionItem.fromStartHrs = fromStartHrs
+        auctionItem.price = price
+      })
+
+      setAuctionList(rawAuctionList)
+    } catch (e) {
+      toast({
+        title: t("networkError"),
+        description: String(e)
+      })
     }
   }
 
   useEffect(() => {
     const interval = setInterval(() => {
-      console.log(interval)
-      setTimeout(refreshPage, Math.random() * 120)
+      setTimeout(getAuctionList, Math.random() * 120)
     }, 150_000);
 
-    refreshPage();
+    getAuctionList();
 
     return () => clearInterval(interval);
   }, [token])
+
+  useEffect(() => {
+    if (!auctionList.length) return
+
+    auctionList.forEach(async (item, index) => {
+      if (item.costIndex >= item.matchedCi && !item.auctionInfo.startsWith("当前你的公司是最高出价") && item.fromStartHrs >= 24 * 4 - 1) {
+        const bids = JSON.parse(localStorage["bids"])
+        toast({
+          title: `${t("bidFor")} ${item.itemName}`,
+          description: `${t("bidPriceIs")} ${item.price.toLocaleString()}`
+        })
+
+        bids[item.id] = item.price
+        localStorage["bids"] = JSON.stringify(bids)
+
+        try {
+          await fetch("https://tools.dc-eve.com/qq/auction/submit", {
+            method: "POST", body: JSON.stringify({
+              id: item.id,
+              price: item.price
+            }), headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+              Cookie: `tools_remember=${token}`
+            }
+          })
+        } catch (e) {
+          toast({
+            title: t("networkError"),
+            description: String(e)
+          })
+        }
+      } else {
+        console.log(">>>> skipped", item.itemName, "in region", item.regionName, "cost index", item.costIndex, "/", item.matchedCi)
+      }
+    })
+  }, [auctionList])
 
   const matchRule = (auctionItem: AuctionItem) => {
     let costIndex = Infinity
@@ -149,182 +319,6 @@ export default function AuctionForm() {
 
     return costIndex
   }
-
-  useEffect(() => {
-    if (auctionList.length === 0) return
-    const moons = auctionList.reduce((a, c) => {
-      return `${a}\n${c.itemDetail}`
-    }, "")
-
-    fetch('/api/format', {
-      method: 'POST', body: JSON.stringify({
-        data: moons
-      })
-    })
-      .then(resp => resp.json())
-      .then(data => {
-        const rows = data.result.split("\n")
-        const moons = [] as MoonData[]
-        const itemsMap = new Map<number, boolean>()
-        const currentMoon = {
-          name: "",
-          materials: {},
-          materialsManual: {},
-          volume: 0
-        } as MoonData
-        for (let i = 1; i < rows.length; i++) {
-          if (rows[i].split(" ").length !== 1) {
-            if (currentMoon.name) moons.push({ ...currentMoon })
-            // create a new moon
-            currentMoon.name = rows[i].replaceAll("\t", "")
-            currentMoon.materials = {}
-            currentMoon.materialsManual = {}
-            currentMoon.volume = 0
-          } else if (rows[i] !== "" && rows[i] !== "skyhook") {
-            const row = rows[i].split("\t")
-            const [_, __, quantity, id] = row
-            // const quantity = parseFloat(row[2])
-            // const id = row[3]
-
-            const materialsCanBeMined = typeMaterials[id]?.materials.filter((material: { materialTypeID: number }) => material.materialTypeID > 100)
-
-            const oreMap = {
-              4: 45493,
-              8: 45497,
-              16: 45501,
-              32: 45506
-            }
-
-            if (parseInt(id) > oreMap[8]) {
-              currentMoon.volume += Math.floor(30 * parseFloat(quantity)) * 10 * 100
-              typeMaterials[id]?.materials.forEach((materail: { materialTypeID: number, quantity: number }) => {
-                currentMoon.materialsManual[materail.materialTypeID] = (currentMoon.materialsManual[materail.materialTypeID] || 0) + Math.floor(Math.floor(materail.quantity * 30 * parseFloat(quantity)) * 0.87)
-                // itemsMap.set(materail.materialTypeID, true)
-              })
-            }
-
-            materialsCanBeMined.forEach((materail: { materialTypeID: number, quantity: number }) => {
-              currentMoon.materials[materail.materialTypeID] = (currentMoon.materials[materail.materialTypeID] || 0) + Math.floor(materail.quantity * 12 * parseFloat(quantity))
-              itemsMap.set(materail.materialTypeID, true)
-            })
-          }
-        }
-        if (currentMoon.name) moons.push({ ...currentMoon })
-
-        // 默认查询岩浆气的价格
-        const items = [81143]
-        itemsMap.forEach((_, key) => { items.push(key) })
-
-        fetch("https://eve.c3q.cc/market/api/", {
-          method: 'post', headers: {
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
-          }, body: new URLSearchParams({
-            queryBuyAssess: JSON.stringify(items),
-            buy_location_id: "[30000142]",
-            querySellAssess: JSON.stringify(items),
-            sell_location_id: "[30000142]"
-          }).toString()
-        })
-          .then(resp => resp.json())
-          .then(data => {
-            // console.log(data)
-            setItemPriceMap(data)
-            moons.forEach((moon, index) => {
-              if (auctionList[index].itemCategory === "天钩") {
-                moon.buy = parseInt(auctionList[index].itemDetail.split("[")[1].split("]")[0]) * data.queryBuyAssess.result[81143].max_price.price
-                // console.log(moon)
-                return
-              }
-
-              let sell = 0
-              let buy = 0
-              let manual = 0
-              Object.keys(moon.materials).forEach((key) => {
-                sell += moon.materials[parseInt(key)] * data.querySellAssess.result[key].min_price.price
-                buy += moon.materials[parseInt(key)] * data.queryBuyAssess.result[key].max_price.price
-              })
-
-              Object.keys(moon.materialsManual).forEach((key) => {
-                manual += (moon.materialsManual[parseInt(key)] * data.queryBuyAssess.result[key].max_price.price + moon.materialsManual[parseInt(key)] * data.querySellAssess.result[key].min_price.price) / 2
-              })
-              moon.buy = buy
-              moon.sell = sell
-              moon.manualPrice = manual
-              // console.log(manual)
-            })
-
-            setAnalyzeData(moons)
-
-            try {
-              console.log(auctionList)
-              auctionList.forEach(async (auctionItem, index) => {
-                const matchedCostIndex = matchRule(auctionItem)
-                const fromStartHrs = Math.ceil((new Date().getTime() - new Date(auctionItem.startTime).getTime()) / 1000 / 3600)
-
-                const bids: Bids = JSON.parse(localStorage["bids"] || "{}")
-        
-                const bid = auctionItem.auctionInfo === "当前无人竞拍" ? parseInt(auctionItem.startPrice.replaceAll(",", "")) + 1 : 
-                  parseInt(auctionItem.auctionInfo.replace("当前第二高拍卖价为", "").replace("当前你的公司是最高出价:", "").replaceAll(",", ""))
-                // console.log(auctionItem.itemDetail)
-                const benefit = (() => {
-                  switch (auctionItem.itemCategory) {
-                    case "天钩":
-                      return moons[index]?.buy
-                    case "手动月矿":
-                      return moons[index]?.manualPrice
-                    case "自动月矿":
-                      return moons[index]?.buy - itemPriceMap.queryBuyAssess.result[81143].max_price.price * 55 - 90000
-                  }
-                })() * 24 * 90
-
-                // console.log(benefit)
-                let price = bid || parseInt(auctionItem.startPrice.replaceAll(",", ""))
-                if (auctionItem.auctionInfo.startsWith("当前第二高拍卖价为")) {
-                  // price += 100_000_000
-                  price = Math.max(bids[auctionItem.id] || 0, price) + 10_000_000
-                }
-
-                console.log(price, bid)
-
-                const costIndex = ((benefit - price) / price)
-
-                const submitBid = (price: number, id: number | string) => {
-                  fetch("https://tools.dc-eve.com/qq/auction/submit", {
-                    method: "POST", body: JSON.stringify({
-                      id,
-                      price
-                    }), headers: {
-                      Authorization: `Bearer ${token}`,
-                      "Content-Type": "application/json",
-                      Cookie: `tools_remember=${token}`
-                    }
-                  })
-                    .then(resp => resp.json())
-                    .then(() => {
-                      refreshPage()
-                    })
-                }
-
-                console.log(benefit, costIndex, matchedCostIndex, auctionItem.itemName, auctionItem.auctionInfo)
-        
-                if (costIndex >= matchedCostIndex && !auctionItem.auctionInfo.startsWith("当前你的公司是最高出价")) {
-                  // console.log("bidding", auctionItem.itemName, "for", price)
-                  toast({
-                    title: `${t("bidFor")} ${auctionItem.itemName}`,
-                    description: `${t("bidPriceIs")} ${price.toLocaleString()}`
-                  })
-
-                  bids[auctionItem.id] = price
-                  localStorage["bids"] = JSON.stringify(bids)
-                  submitBid(price, auctionItem.id)
-                  throw("")
-                }
-              })
-            } catch(_) {}
-            // console.log(moons)
-          })
-      })
-  }, [auctionList])
 
   const rulesForm = useForm<z.infer<typeof RulesFormSchema>>({
     resolver: zodResolver(RulesFormSchema),
@@ -450,36 +444,16 @@ export default function AuctionForm() {
               // auctionList.map((item, index) => {
               auctionList
                 .filter(item => item.auctionStatus !== "已结束")
-                .filter(item => item.itemCategory === "手动月矿" || item.itemCategory === "自动月矿" || item.itemCategory === "天钩")
                 .map((item, index) => {
-                  // const benefit = item.itemCategory === "手动月矿" ? (analyzeData[index]?.manualPrice || : (item.itemCategory === "天钩" ? (analyzeData[index]?.buy - itemPriceMap.queryBuyAssess.result[81143].max_price.price * 55 - 90000) : 0 )) * 24 * 90
-                  const bid = item.auctionInfo === "当前无人竞拍" ? parseInt(item.startPrice.replaceAll(",", "")) + 1 : 
-                    parseInt(item.auctionInfo.replace("当前第二高拍卖价为", "").replace("当前你的公司是最高出价:", "").replaceAll(",", ""))
-                  // console.log(itemPriceMap)
-                  const benefit = (() => {
-                    switch (item.itemCategory) {
-                      case "天钩":
-                        return analyzeData[index]?.buy
-                      case "手动月矿":
-                        return analyzeData[index]?.manualPrice
-                      case "自动月矿":
-                        return analyzeData[index]?.buy - itemPriceMap.queryBuyAssess.result[81143].max_price.price * 55 - 90000
-                    }
-                  })() * 24 * 90
-                  const price = bid || parseInt(item.startPrice.replaceAll(",", ""))
-                  const costIndex = ((benefit - price) / price)
-                  const matchedCi = matchRule(item)
-
                   return <TableRow key={index}>
                     <TableCell>{t(categoryMap[item.itemCategory])}</TableCell>
                     <TableCell>{t(item.regionName.toLocaleLowerCase())}</TableCell>
                     <TableCell>{item.systemName}</TableCell>
-                    <TableCell>{benefit.toLocaleString()}</TableCell>
+                    <TableCell>{item.value.toLocaleString()}</TableCell>
                     <TableCell>{item.itemName}</TableCell>
                     <TableCell className="text-right" style={{
-                      color: matchedCi > costIndex ? "red" : "green"
-                    }}>{`${costIndex.toFixed(2)}${matchedCi > costIndex ? "" : ` / ${matchedCi}`}`}</TableCell>
-                    {/* <TableCell className="text-right">{price.toLocaleString()}</TableCell> */}
+                      color: item.matchedCi > item.costIndex ? "red" : "green"
+                    }}>{`${item.costIndex.toFixed(2)}${item.matchedCi > item.costIndex ? "" : ` / ${item.matchedCi}`}`}</TableCell>
                     <TableCell className="text-right">{item.auctionInfo}</TableCell>
                   </TableRow>
                 })}

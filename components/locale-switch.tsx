@@ -43,8 +43,6 @@ export default function LocaleSwitch() {
     setValue(location.pathname.split("/")[1])
   }, [])
 
-  console.log(pathname)
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>

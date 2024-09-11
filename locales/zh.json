@@ -40,6 +40,7 @@
     "currentCostIndex": "当前 Cost Index",
     "name": "名称",
     "bidFor": "出价",
-    "bidPriceIs": "价格为"
+    "bidPriceIs": "价格为",
+    "networkError": "网络错误"
   }
 }

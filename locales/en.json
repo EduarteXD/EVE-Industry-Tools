@@ -40,6 +40,7 @@
     "currentCostIndex": "Current Cost Index",
     "name": "Name",
     "bidFor": "Bid for",
-    "bidPriceIs": "Bid price is"
+    "bidPriceIs": "Bid price is",
+    "networkError": "Network Error"
   }
 }
