@@ -16,7 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Input } from './ui/input'
-import { Loader, LoaderCircle, Trash2 } from 'lucide-react'
+import { ArrowUpDown, Loader, LoaderCircle, SortAsc, SortDesc, Trash2 } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -88,6 +88,9 @@ export default function AuctionForm() {
   const [token, setToken] = useState("")
   const [auctionList, setAuctionList] = useState<AuctionItem[]>([])
   const [rules, setRules] = useState<AuctionRule[]>([])
+  const [ciDesc, setCiDesc] = useState(true)
+  const [regionDesc, setRegionDesc] = useState(true)
+  const [valueDesc, setValueDesc] = useState(true)
 
   const { toast } = useToast()
 
@@ -113,6 +116,15 @@ export default function AuctionForm() {
     })
 
     return costIndex
+  }
+
+  const handleSort = (key: keyof AuctionItem, desc: boolean = true) => {
+    const rawAuctionList = auctionList
+    rawAuctionList.sort((a: AuctionItem, b: AuctionItem) => {
+      return (a[key] === b[key]) ? 0 : (desc ? (a[key] < b[key] ? 1 : -1) : (a[key] > b[key] ? 1 : -1));
+    })
+
+    setAuctionList([...rawAuctionList])
   }
 
   const getAuctionList = async () => {
@@ -250,7 +262,7 @@ export default function AuctionForm() {
 
         let price = bid || parseInt(auctionItem.startPrice.replaceAll(",", ""))
         if (auctionItem.auctionInfo.startsWith("当前第二高拍卖价为")) {
-          price = Math.max(bids[auctionItem.id] || 0, price) + 10_000_000
+          price = Math.floor((Math.max(bids[auctionItem.id] || 0, price) + 10_000_000) / 10) * 10
         }
 
         auctionItem.costIndex = ((benefit - price) / price)
@@ -270,6 +282,11 @@ export default function AuctionForm() {
   }
 
   useEffect(() => {
+    setAuctionList([])
+    getAuctionList()
+  }, [rules])
+
+  useEffect(() => {
     const interval = setInterval(() => {
       setTimeout(getAuctionList, Math.random() * 120)
     }, 150_000);
@@ -284,7 +301,7 @@ export default function AuctionForm() {
 
     auctionList.forEach(async (item, index) => {
       if (item.costIndex >= item.matchedCi && !item.auctionInfo.startsWith("当前你的公司是最高出价") && item.fromStartHrs >= 24 * 4 - 1) {
-        const bids = JSON.parse(localStorage["bids"])
+        const bids = JSON.parse(localStorage["bids"] || "[]")
         toast({
           title: `${t("bidFor")} ${item.itemName}`,
           description: `${t("bidPriceIs")} ${item.price.toLocaleString()}`
@@ -424,11 +441,41 @@ export default function AuctionForm() {
           <TableHeader>
             <TableRow>
               <TableHead>{t("category")}</TableHead>
-              <TableHead>{t("region")}</TableHead>
+              <TableHead className="flex items-center justify-start gap-1">
+                {t("region")}
+                <Button variant="ghost" className='p-2'
+                  onClick={() => {
+                    setRegionDesc(!regionDesc)
+                    handleSort("regionName", regionDesc)
+                  }}
+                >
+                  <ArrowUpDown className='w-4 h-4' />
+                </Button>
+              </TableHead>
               <TableHead>{t("system")}</TableHead>
-              <TableHead>{t("value")}</TableHead>
+              <TableHead className="flex items-center justify-start gap-1">
+                {t("value")}
+                <Button variant="ghost" className='p-2'
+                  onClick={() => {
+                    setValueDesc(!valueDesc)
+                    handleSort("value", valueDesc)
+                  }}
+                >
+                  <ArrowUpDown className='w-4 h-4' />
+                </Button>
+              </TableHead>
               <TableHead>{t("name")}</TableHead>
-              <TableHead className="text-right">{t("currentCostIndex")}</TableHead>
+              <TableHead className="text-right flex items-center justify-end gap-1">
+                {t("currentCostIndex")} 
+                <Button variant="ghost" className='p-2'
+                  onClick={() => {
+                    setCiDesc(!ciDesc)
+                    handleSort("costIndex", ciDesc)
+                  }}
+                >
+                  <ArrowUpDown className='w-4 h-4' />
+                </Button>
+              </TableHead>
               {/* <TableHead className="text-right">{t("bid")}</TableHead> */}
               <TableHead className="text-right">{t("status")}</TableHead>
               <TableHead className="text-right">{t("timeLeft")}</TableHead>
