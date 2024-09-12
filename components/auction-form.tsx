@@ -352,7 +352,6 @@ export default function AuctionForm() {
           <TableBody>
             {
               rules.map((rule, index) => {
-
                 return <TableRow key={index}>
                   <TableCell className="w-[120px]">{index}</TableCell>
                   <TableCell>{t(categoryMap[rule.itemCategory])}</TableCell>
