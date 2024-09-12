@@ -37,11 +37,13 @@
     "value": "价值",
     "bid": "竞价",
     "status": "状态",
-    "currentCostIndex": "当前 Cost Index",
+    "currentCostIndex": "当前 / 最低 Cost Index",
     "name": "名称",
     "bidFor": "出价",
     "bidPriceIs": "价格为",
     "networkError": "网络错误",
-    "timeLeft": "剩余时间"
+    "timeLeft": "剩余时间",
+    "addToExclude": "排除此项",
+    "removeFromExclude": "取消排除"
   }
 }

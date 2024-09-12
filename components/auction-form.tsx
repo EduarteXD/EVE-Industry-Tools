@@ -15,8 +15,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Input } from './ui/input'
-import { ArrowUpDown, Loader, LoaderCircle, SortAsc, SortDesc, Trash2 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { ArrowUpDown, LoaderCircle, PackageMinus, PackagePlus, Trash2 } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -38,6 +38,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { useTranslations } from 'next-intl'
 import { useToast } from "@/hooks/use-toast"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 
 interface ItemData {
   volume: number
@@ -91,6 +92,8 @@ export default function AuctionForm() {
   const [ciDesc, setCiDesc] = useState(true)
   const [regionDesc, setRegionDesc] = useState(true)
   const [valueDesc, setValueDesc] = useState(true)
+  const [statusDesc, setStatusDesc] = useState(true)
+  const [excludeList, setExcludeList] = useState<string[]>([])
 
   const { toast } = useToast()
 
@@ -104,11 +107,14 @@ export default function AuctionForm() {
 
   useEffect(() => {
     setToken(sessionStorage["token"] || "")
-    setRules(JSON.parse(sessionStorage["rules"] || "[]"))
+    setRules(JSON.parse(localStorage["rules"] || "[]"))
+    setExcludeList(JSON.parse(localStorage["excludeList"] || "[]"))
   }, [])
 
   const matchRule = (auctionItem: AuctionItem) => {
     let costIndex = Infinity
+    if (excludeList.includes(auctionItem.itemName)) return costIndex
+
     rules.forEach((rule) => {
       if (auctionItem.itemCategory !== rule.itemCategory) return
       if (auctionItem.regionName !== rule.regionName) return
@@ -282,9 +288,11 @@ export default function AuctionForm() {
   }
 
   useEffect(() => {
+    if (rules.length) localStorage["rules"] = JSON.stringify(rules)
+    if (excludeList.length) localStorage["excludeList"] = JSON.stringify(excludeList)
     setAuctionList([])
     getAuctionList()
-  }, [rules])
+  }, [rules, excludeList])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -338,6 +346,9 @@ export default function AuctionForm() {
 
   const rulesForm = useForm<z.infer<typeof RulesFormSchema>>({
     resolver: zodResolver(RulesFormSchema),
+    defaultValues: {
+      costIndex: "1"
+    }
   })
 
   const onSubmit = (data: z.infer<typeof RulesFormSchema>) => {
@@ -346,11 +357,11 @@ export default function AuctionForm() {
       regionName: data.region as "Catch" | "Querious",
       itemCategory: data.category as "自动月矿" | "手动月矿"
     }])
-    sessionStorage["rules"] = JSON.stringify([...rules, {
-      costIndex: parseFloat(data.costIndex),
-      regionName: data.region as "Catch" | "Querious",
-      itemCategory: data.category as "自动月矿" | "手动月矿"
-    }])
+    // localStorage["rules"] = JSON.stringify([...rules, {
+    //   costIndex: parseFloat(data.costIndex),
+    //   regionName: data.region as "Catch" | "Querious",
+    //   itemCategory: data.category as "自动月矿" | "手动月矿"
+    // }])
   }
 
   return <>
@@ -361,7 +372,7 @@ export default function AuctionForm() {
             <TableRow>
               <TableHead className="w-[120px]">{t("ruleId")}</TableHead>
               <TableHead>{t("category")}</TableHead>
-              <TableHead className="text-right">{t("region")}</TableHead>
+              <TableHead>{t("region")}</TableHead>
               <TableHead className="text-right">{t("costIndex")}</TableHead>
               <TableHead className="text-right">{t("operation")}</TableHead>
             </TableRow>
@@ -372,12 +383,30 @@ export default function AuctionForm() {
                 return <TableRow key={index}>
                   <TableCell className="w-[120px]">{index}</TableCell>
                   <TableCell>{t(categoryMap[rule.itemCategory])}</TableCell>
-                  <TableCell className="text-right">{rule.regionName}</TableCell>
+                  <TableCell>{rule.regionName}</TableCell>
                   <TableCell className="text-right">{rule.costIndex}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" onClick={() => {
                       setRules(rules.filter(_rule => _rule !== rule))
-                      sessionStorage["rules"] = JSON.stringify(rules.filter(_rule => _rule !== rule))
+                      // localStorage["rules"] = JSON.stringify(rules.filter(_rule => _rule !== rule))
+                    }}>
+                      <Trash2 className='w-4 h-4' />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              })
+            }
+            {
+              excludeList.map((rule, index) => {
+                return <TableRow key={index}>
+                  <TableCell className="w-[120px]">Exclude-{index}</TableCell>
+                  <TableCell>{rule}</TableCell>
+                  <TableCell></TableCell>
+                  <TableCell className="text-right"></TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" onClick={() => {
+                      setExcludeList(excludeList.filter(_rule => _rule !== rule))
+                      // localStorage["rules"] = JSON.stringify(rules.filter(_rule => _rule !== rule))
                     }}>
                       <Trash2 className='w-4 h-4' />
                     </Button>
@@ -441,44 +470,62 @@ export default function AuctionForm() {
           <TableHeader>
             <TableRow>
               <TableHead>{t("category")}</TableHead>
-              <TableHead className="flex items-center justify-start gap-1">
-                {t("region")}
-                <Button variant="ghost" className='p-2'
-                  onClick={() => {
-                    setRegionDesc(!regionDesc)
-                    handleSort("regionName", regionDesc)
-                  }}
-                >
-                  <ArrowUpDown className='w-4 h-4' />
-                </Button>
+              <TableHead>
+                <div className='flex items-center justify-start gap-1'>
+                  {t("region")}
+                  <Button variant="ghost" className='p-2'
+                    onClick={() => {
+                      setRegionDesc(!regionDesc)
+                      handleSort("regionName", regionDesc)
+                    }}
+                  >
+                    <ArrowUpDown className='w-4 h-4' />
+                  </Button>
+                </div>
               </TableHead>
               <TableHead>{t("system")}</TableHead>
-              <TableHead className="flex items-center justify-start gap-1">
-                {t("value")}
-                <Button variant="ghost" className='p-2'
-                  onClick={() => {
-                    setValueDesc(!valueDesc)
-                    handleSort("value", valueDesc)
-                  }}
-                >
-                  <ArrowUpDown className='w-4 h-4' />
-                </Button>
+              <TableHead>
+                <div className='flex items-center justify-start gap-1'>
+                  {t("value")}
+                  <Button variant="ghost" className='p-2'
+                    onClick={() => {
+                      setValueDesc(!valueDesc)
+                      handleSort("value", valueDesc)
+                    }}
+                  >
+                    <ArrowUpDown className='w-4 h-4' />
+                  </Button>
+                </div>
               </TableHead>
               <TableHead>{t("name")}</TableHead>
-              <TableHead className="text-right flex items-center justify-end gap-1">
-                {t("currentCostIndex")} 
-                <Button variant="ghost" className='p-2'
-                  onClick={() => {
-                    setCiDesc(!ciDesc)
-                    handleSort("costIndex", ciDesc)
-                  }}
-                >
-                  <ArrowUpDown className='w-4 h-4' />
-                </Button>
+              <TableHead className="text-right">
+                <div className='flex items-center justify-end gap-1'>
+                  {t("currentCostIndex")}
+                  <Button variant="ghost" className='p-2'
+                    onClick={() => {
+                      setCiDesc(!ciDesc)
+                      handleSort("costIndex", ciDesc)
+                    }}
+                  >
+                    <ArrowUpDown className='w-4 h-4' />
+                  </Button></div>
               </TableHead>
               {/* <TableHead className="text-right">{t("bid")}</TableHead> */}
-              <TableHead className="text-right">{t("status")}</TableHead>
+              <TableHead className="text-right">
+                <div className='flex items-center justify-end gap-1'>
+                  {t("status")}
+                  <Button variant="ghost" className='p-2'
+                    onClick={() => {
+                      setStatusDesc(!statusDesc)
+                      handleSort("auctionInfo", statusDesc)
+                    }}
+                  >
+                    <ArrowUpDown className='w-4 h-4' />
+                  </Button>
+                </div>
+              </TableHead>
               <TableHead className="text-right">{t("timeLeft")}</TableHead>
+              <TableHead className="text-right">{t("operation")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -495,13 +542,34 @@ export default function AuctionForm() {
                       <TableCell>{item.itemName}</TableCell>
                       <TableCell className="text-right" style={{
                         color: item.matchedCi > item.costIndex ? "red" : "green"
-                      }}>{`${item.costIndex.toFixed(2)}${item.matchedCi > item.costIndex ? "" : ` / ${item.matchedCi}`}`}</TableCell>
+                      }}>{`${item.costIndex.toFixed(2)}${item.matchedCi === Infinity ? " / ∞" : ` / ${item.matchedCi}`}`}</TableCell>
                       <TableCell className="text-right">{item.auctionInfo}</TableCell>
                       <TableCell className="text-right">{24 * 4 + 12 - item.fromStartHrs} (±12) h</TableCell>
+                      <TableCell className="text-center">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" onClick={() => {
+                                if (excludeList.includes(item.itemName)) {
+                                  setExcludeList(excludeList.filter((itemName) => itemName !== item.itemName))
+                                } else {
+                                  setExcludeList([...excludeList, item.itemName])
+                                }
+                              }}>
+                                {excludeList.includes(item.itemName) ? <PackagePlus className='h-4 w-4' /> : <PackageMinus className='h-4 w-4' />}
+
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{excludeList.includes(item.itemName) ? t("removeFromExclude") : t("addToExclude")}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
                     </TableRow>
-                }) :
+                  }) :
                 <TableRow>
-                  <TableCell colSpan={8}>
+                  <TableCell colSpan={9}>
                     <LoaderCircle className='m-auto animate-spin w-4 h-4 my-4' stroke='gray' />
                   </TableCell>
                 </TableRow>
