@@ -309,7 +309,7 @@ export default function AuctionForm() {
 
     auctionList.forEach(async (item, index) => {
       if (item.costIndex >= item.matchedCi && !item.auctionInfo.startsWith("当前你的公司是最高出价") && item.fromStartHrs >= 24 * 4 - 1) {
-        const bids = JSON.parse(localStorage["bids"] || "[]")
+        const bids = JSON.parse(localStorage["bids"] || "{}")
         toast({
           title: `${t("bidFor")} ${item.itemName}`,
           description: `${t("bidPriceIs")} ${item.price.toLocaleString()}`
