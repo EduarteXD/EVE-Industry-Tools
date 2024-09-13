@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 // @ts-ignore
 import typeMaterials from './typeMaterials.yml'
 
@@ -96,6 +96,9 @@ export default function AuctionForm() {
   const [statusDesc, setStatusDesc] = useState(true)
   const [excludeList, setExcludeList] = useState<string[]>([])
 
+  const rulesRef = useRef<AuctionRule[]>(rules)
+  const excludeListRef = useRef<string[]>(excludeList)
+
   const { toast } = useToast()
 
   const categoryMap = {
@@ -119,9 +122,9 @@ export default function AuctionForm() {
    */
   const matchRule = (auctionItem: AuctionItem) => {
     let costIndex = Infinity
-    if (excludeList.includes(auctionItem.itemName)) return costIndex
+    if (excludeListRef.current.includes(auctionItem.itemName)) return costIndex
 
-    rules.forEach((rule) => {
+    rulesRef.current.forEach((rule) => {
       if (auctionItem.itemCategory !== rule.itemCategory) return
       if (auctionItem.regionName !== rule.regionName) return
       costIndex = Math.min(costIndex, rule.costIndex)
@@ -324,8 +327,9 @@ export default function AuctionForm() {
 
   // useEffect 钩子用于管理拍卖列表更新、轮询和拍卖逻辑
   useEffect(() => {
-    if (rules.length) localStorage["rules"] = JSON.stringify(rules)
-    if (excludeList.length) localStorage["excludeList"] = JSON.stringify(excludeList)
+    rulesRef.current = rules
+    excludeListRef.current = excludeList
+
     setAuctionList([])
     getAuctionList()
   }, [rules, excludeList])
@@ -333,7 +337,7 @@ export default function AuctionForm() {
   useEffect(() => {
     const interval = setInterval(() => {
       setTimeout(getAuctionList, Math.random() * 120)
-    }, 150_000);
+    }, 30_000);
 
     getAuctionList();
 
@@ -375,7 +379,7 @@ export default function AuctionForm() {
           })
         }
       } else {
-        console.log(">>>> skipped", item.itemName, "in region", item.regionName, "cost index", item.costIndex, "/", item.matchedCi)
+        // console.log(">>>> skipped", item.itemName, "in region", item.regionName, "cost index", item.costIndex, "/", item.matchedCi)
       }
     })
   }, [auctionList])
@@ -392,11 +396,13 @@ export default function AuctionForm() {
    * @param data 表单数据
    */
   const onSubmit = (data: z.infer<typeof RulesFormSchema>) => {
-    setRules([...rules, {
+    const _rules = [...rules, {
       costIndex: parseFloat(data.costIndex),
       regionName: data.region as "Catch" | "Querious",
       itemCategory: data.category as "自动月矿" | "手动月矿"
-    }])
+    }]
+    setRules(_rules)
+    localStorage["rules"] = JSON.stringify(_rules)
   }
 
   return <>
@@ -422,8 +428,9 @@ export default function AuctionForm() {
                   <TableCell className="text-right">{rule.costIndex}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" onClick={() => {
-                      setRules(rules.filter(_rule => _rule !== rule))
-                      // localStorage["rules"] = JSON.stringify(rules.filter(_rule => _rule !== rule))
+                      const _rules = rules.filter(_rule => _rule !== rule)
+                      setRules(_rules)
+                      localStorage["rules"] = JSON.stringify(_rules)
                     }}>
                       <Trash2 className='w-4 h-4' />
                     </Button>
@@ -440,8 +447,9 @@ export default function AuctionForm() {
                   <TableCell className="text-right"></TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" onClick={() => {
-                      setExcludeList(excludeList.filter(_rule => _rule !== rule))
-                      // localStorage["rules"] = JSON.stringify(rules.filter(_rule => _rule !== rule))
+                      const _excludeList = excludeList.filter(_rule => _rule !== rule)
+                      setExcludeList(_excludeList)
+                      localStorage["excludeList"] = JSON.stringify(_excludeList)
                     }}>
                       <Trash2 className='w-4 h-4' />
                     </Button>
@@ -585,9 +593,13 @@ export default function AuctionForm() {
                             <TooltipTrigger asChild>
                               <Button variant="ghost" onClick={() => {
                                 if (excludeList.includes(item.itemName)) {
-                                  setExcludeList(excludeList.filter((itemName) => itemName !== item.itemName))
+                                  const _excludeList = excludeList.filter((itemName) => itemName !== item.itemName)
+                                  setExcludeList(_excludeList)
+                                  localStorage["excludeList"] = JSON.stringify(_excludeList)
                                 } else {
-                                  setExcludeList([...excludeList, item.itemName])
+                                  const _excludeList =[...excludeList, item.itemName]
+                                  setExcludeList(_excludeList)
+                                  localStorage["excludeList"] = JSON.stringify(_excludeList)
                                 }
                               }}>
                                 {excludeList.includes(item.itemName) ? <PackagePlus className='h-4 w-4' /> : <PackageMinus className='h-4 w-4' />}
