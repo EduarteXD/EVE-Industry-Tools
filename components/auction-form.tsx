@@ -405,7 +405,7 @@ export default function AuctionForm() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[120px]">{t("ruleId")}</TableHead>
+              {/* <TableHead className="w-[120px]">{t("ruleId")}</TableHead> */}
               <TableHead>{t("category")}</TableHead>
               <TableHead>{t("region")}</TableHead>
               <TableHead className="text-right">{t("costIndex")}</TableHead>
@@ -416,7 +416,7 @@ export default function AuctionForm() {
             {
               rules.map((rule, index) => {
                 return <TableRow key={index}>
-                  <TableCell className="w-[120px]">{index}</TableCell>
+                  {/* <TableCell className="w-[120px]">{index}</TableCell> */}
                   <TableCell>{t(categoryMap[rule.itemCategory])}</TableCell>
                   <TableCell>{rule.regionName}</TableCell>
                   <TableCell className="text-right">{rule.costIndex}</TableCell>
@@ -434,7 +434,7 @@ export default function AuctionForm() {
             {
               excludeList.map((rule, index) => {
                 return <TableRow key={index}>
-                  <TableCell className="w-[120px]">Exclude-{index}</TableCell>
+                  {/* <TableCell className="w-[120px]">Exclude-{index}</TableCell> */}
                   <TableCell>{rule}</TableCell>
                   <TableCell></TableCell>
                   <TableCell className="text-right"></TableCell>
