@@ -90,6 +90,7 @@ export default function AuctionForm() {
   const [auctionList, setAuctionList] = useState<AuctionItem[]>([])
   const [rules, setRules] = useState<AuctionRule[]>([])
   const [ciDesc, setCiDesc] = useState(true)
+  const [filter, setFilter] = useState<keyof AuctionItem | "">("")
   const [regionDesc, setRegionDesc] = useState(true)
   const [valueDesc, setValueDesc] = useState(true)
   const [statusDesc, setStatusDesc] = useState(true)
@@ -111,6 +112,11 @@ export default function AuctionForm() {
     setExcludeList(JSON.parse(localStorage["excludeList"] || "[]"))
   }, [])
 
+  /**
+   * 根据定义的规则匹配拍卖物品
+   * @param auctionItem Auction item
+   * @returns 匹配到最低的 Cost Index
+   */
   const matchRule = (auctionItem: AuctionItem) => {
     let costIndex = Infinity
     if (excludeList.includes(auctionItem.itemName)) return costIndex
@@ -124,15 +130,41 @@ export default function AuctionForm() {
     return costIndex
   }
 
-  const handleSort = (key: keyof AuctionItem, desc: boolean = true) => {
+  /**
+   * 对拍卖列表进行排序
+   * @param key 需要排序的 Key
+   * @returns 排序完的列表
+   */
+  const sortAuctionItem = (key: keyof AuctionItem | "") => {
     const rawAuctionList = auctionList
+    const desc = (() => {
+      switch (key) {
+        case "costIndex":
+          return ciDesc
+        case "regionName":
+          return regionDesc
+        case "value":
+          return valueDesc
+        case "auctionInfo":
+          return statusDesc
+        default:
+          return true
+      }
+    })()
+
+    if (key === "") return auctionList
+
     rawAuctionList.sort((a: AuctionItem, b: AuctionItem) => {
       return (a[key] === b[key]) ? 0 : (desc ? (a[key] < b[key] ? 1 : -1) : (a[key] > b[key] ? 1 : -1));
     })
 
-    setAuctionList([...rawAuctionList])
+    return rawAuctionList
   }
 
+  /**
+   * 从服务器获取拍卖列表，格式化后并更新 auctionList 状态
+   * @returns void
+   */
   const getAuctionList = async () => {
     if (!token) return
     try {
@@ -155,6 +187,7 @@ export default function AuctionForm() {
         }
       })).json()).data.data
 
+      // 格式化数据以适配数据处理api
       const rawItems = rawAuctionList.reduce((a, c) => {
         return `${a}\n${c.itemDetail}`
       }, "")
@@ -185,8 +218,10 @@ export default function AuctionForm() {
           const row = rows[i].split("\t")
           const [_, __, quantity, id] = row
 
+          // Metenox钻机可获取到的元素不包含普矿
           const materialsCanBeMined = typeMaterials[id]?.materials.filter((material: { materialTypeID: number }) => material.materialTypeID > 100)
 
+          // 分隔 R4 R8 R16 R32 的物品id
           const oreMap = {
             4: 45493,
             8: 45497,
@@ -287,6 +322,7 @@ export default function AuctionForm() {
     }
   }
 
+  // useEffect 钩子用于管理拍卖列表更新、轮询和拍卖逻辑
   useEffect(() => {
     if (rules.length) localStorage["rules"] = JSON.stringify(rules)
     if (excludeList.length) localStorage["excludeList"] = JSON.stringify(excludeList)
@@ -351,17 +387,16 @@ export default function AuctionForm() {
     }
   })
 
+  /**
+   * 添加新的拍卖规则
+   * @param data 表单数据
+   */
   const onSubmit = (data: z.infer<typeof RulesFormSchema>) => {
     setRules([...rules, {
       costIndex: parseFloat(data.costIndex),
       regionName: data.region as "Catch" | "Querious",
       itemCategory: data.category as "自动月矿" | "手动月矿"
     }])
-    // localStorage["rules"] = JSON.stringify([...rules, {
-    //   costIndex: parseFloat(data.costIndex),
-    //   regionName: data.region as "Catch" | "Querious",
-    //   itemCategory: data.category as "自动月矿" | "手动月矿"
-    // }])
   }
 
   return <>
@@ -476,7 +511,7 @@ export default function AuctionForm() {
                   <Button variant="ghost" className='p-2'
                     onClick={() => {
                       setRegionDesc(!regionDesc)
-                      handleSort("regionName", regionDesc)
+                      setFilter("regionName")
                     }}
                   >
                     <ArrowUpDown className='w-4 h-4' />
@@ -490,7 +525,7 @@ export default function AuctionForm() {
                   <Button variant="ghost" className='p-2'
                     onClick={() => {
                       setValueDesc(!valueDesc)
-                      handleSort("value", valueDesc)
+                      setFilter("value")
                     }}
                   >
                     <ArrowUpDown className='w-4 h-4' />
@@ -504,20 +539,19 @@ export default function AuctionForm() {
                   <Button variant="ghost" className='p-2'
                     onClick={() => {
                       setCiDesc(!ciDesc)
-                      handleSort("costIndex", ciDesc)
+                      setFilter("costIndex")
                     }}
                   >
                     <ArrowUpDown className='w-4 h-4' />
                   </Button></div>
               </TableHead>
-              {/* <TableHead className="text-right">{t("bid")}</TableHead> */}
               <TableHead className="text-right">
                 <div className='flex items-center justify-end gap-1'>
                   {t("status")}
                   <Button variant="ghost" className='p-2'
                     onClick={() => {
                       setStatusDesc(!statusDesc)
-                      handleSort("auctionInfo", statusDesc)
+                      setFilter("auctionInfo")
                     }}
                   >
                     <ArrowUpDown className='w-4 h-4' />
@@ -531,7 +565,7 @@ export default function AuctionForm() {
           <TableBody>
             {
               auctionList.length ?
-                auctionList
+                sortAuctionItem(filter)
                   .filter(item => item.auctionStatus !== "已结束")
                   .map((item, index) => {
                     return <TableRow key={index}>
