@@ -133,7 +133,7 @@ export default function DataProcessForm() {
           })
 
           Object.keys(moon.materialsManual).forEach((key) => {
-            manual += (moon.materialsManual[parseInt(key)] * data.queryBuyAssess.result[key].max_price.price + moon.materialsManual[parseInt(key)] * data.querySellAssess.result[key].min_price.price) / 2
+            manual += moon.materialsManual[parseInt(key)] * data.queryBuyAssess.result[key].max_price.price
           })
           moon.buy = buy
           moon.sell = sell

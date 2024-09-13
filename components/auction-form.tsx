@@ -274,7 +274,7 @@ export default function AuctionForm() {
         })
 
         Object.keys(item.materialsManual).forEach((key) => {
-          manual += (item.materialsManual[parseInt(key)] * marketData.queryBuyAssess.result[key].max_price.price + item.materialsManual[parseInt(key)] * marketData.querySellAssess.result[key].min_price.price) / 2
+          manual += item.materialsManual[parseInt(key)] * marketData.queryBuyAssess.result[key].max_price.price
         })
 
         item.buy = buy
