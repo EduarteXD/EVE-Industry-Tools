@@ -16,7 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Input } from '@/components/ui/input'
-import { ArrowUpDown, LoaderCircle, PackageMinus, PackagePlus, Trash2 } from 'lucide-react'
+import { ArrowUpDown, LoaderCircle, PackageMinus, PackagePlus, Router, Trash2 } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -39,6 +39,7 @@ import { useForm } from "react-hook-form"
 import { useTranslations } from 'next-intl'
 import { useToast } from "@/hooks/use-toast"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
+import { sendMail } from '@/lib/mail'
 
 interface ItemData {
   volume: number
@@ -96,8 +97,8 @@ export default function AuctionForm() {
   const [statusDesc, setStatusDesc] = useState(true)
   const [excludeList, setExcludeList] = useState<string[]>([])
 
-  const rulesRef = useRef<AuctionRule[]>(rules)
-  const excludeListRef = useRef<string[]>(excludeList)
+  const marketDataRef = useRef<any>({})
+  const marketQueryKeysRef = useRef<number[]>([])
 
   const { toast } = useToast()
 
@@ -122,9 +123,9 @@ export default function AuctionForm() {
    */
   const matchRule = (auctionItem: AuctionItem) => {
     let costIndex = Infinity
-    if (excludeListRef.current.includes(auctionItem.itemName)) return costIndex
+    if (excludeList.includes(auctionItem.itemName)) return costIndex
 
-    rulesRef.current.forEach((rule) => {
+    rules.forEach((rule) => {
       if (auctionItem.itemCategory !== rule.itemCategory) return
       if (auctionItem.regionName !== rule.regionName) return
       costIndex = Math.min(costIndex, rule.costIndex)
@@ -171,14 +172,14 @@ export default function AuctionForm() {
   const getAuctionList = async () => {
     if (!token) return
     try {
-      const rawAuctionList: AuctionItem[] = (await (await fetch("https://tools.dc-eve.com/qq/auction/page", {
+      const rawAuctionList: { total: number, data: AuctionItem[] } = (await (await fetch("https://tools.dc-eve.com/qq/auction/page", {
         method: "POST",
         body: JSON.stringify({
           itemName: "",
           systemId: [],
           constellationId: [],
           regionId: [],
-          auctionStatus: [],
+          auctionStatus: ["1"],
           category: [],
           page: 1,
           size: 999
@@ -186,12 +187,15 @@ export default function AuctionForm() {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
-          Cookie: `tools_remember=${token}`
+          Cookie: `tools_remember=${token}`,
+          Accept: '*/*'
         }
-      })).json()).data.data
+      })).json()).data
+
+      if (rawAuctionList.total === 0) setToken("")
 
       // 格式化数据以适配数据处理api
-      const rawItems = rawAuctionList.reduce((a, c) => {
+      const rawItems = rawAuctionList.data.reduce((a, c) => {
         return `${a}\n${c.itemDetail}`
       }, "")
 
@@ -251,20 +255,40 @@ export default function AuctionForm() {
       const marketItems = [81143]
       marketItemsMap.forEach((_, key) => { marketItems.push(key) })
 
-      const marketData = await (await fetch("https://eve.c3q.cc/market/api/", {
-        method: 'post', headers: {
-          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
-        }, body: new URLSearchParams({
-          queryBuyAssess: JSON.stringify(marketItems),
-          buy_location_id: "[30000142]",
-          querySellAssess: JSON.stringify(marketItems),
-          sell_location_id: "[30000142]"
-        }).toString()
-      })).json()
+      let _marketData = marketDataRef.current
+
+      const marketQueryKeysSet = new Set(marketQueryKeysRef.current);
+      
+      if (!marketItems.every(item => marketQueryKeysSet.has(item))) {
+        _marketData = await (await fetch("https://eve.c3q.cc/market/api/", {
+          method: 'post', headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+          }, body: new URLSearchParams({
+            queryBuyAssess: JSON.stringify(marketItems),
+            buy_location_id: "[30000142]",
+            querySellAssess: JSON.stringify(marketItems),
+            sell_location_id: "[30000142]"
+          }).toString()
+        })).json()
+
+        marketDataRef.current = _marketData
+        marketQueryKeysRef.current = marketItems
+      }
+
+      // const marketData = await (await fetch("https://eve.c3q.cc/market/api/", {
+      //   method: 'post', headers: {
+      //     'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+      //   }, body: new URLSearchParams({
+      //     queryBuyAssess: JSON.stringify(marketItems),
+      //     buy_location_id: "[30000142]",
+      //     querySellAssess: JSON.stringify(marketItems),
+      //     sell_location_id: "[30000142]"
+      //   }).toString()
+      // })).json()
 
       items.forEach((item, index) => {
-        if (rawAuctionList[index].itemCategory === "天钩") {
-          item.buy = parseInt(rawAuctionList[index].itemDetail.split("[")[1].split("]")[0]) * marketData.queryBuyAssess.result[81143].max_price.price
+        if (rawAuctionList.data[index].itemCategory === "天钩") {
+          item.buy = parseInt(rawAuctionList.data[index].itemDetail.split("[")[1].split("]")[0]) * _marketData.queryBuyAssess.result[81143].max_price.price
           return
         }
 
@@ -272,12 +296,12 @@ export default function AuctionForm() {
         let buy = 0
         let manual = 0
         Object.keys(item.materials).forEach((key) => {
-          sell += item.materials[parseInt(key)] * marketData.querySellAssess.result[key].min_price.price
-          buy += item.materials[parseInt(key)] * marketData.queryBuyAssess.result[key].max_price.price
+          sell += item.materials[parseInt(key)] * _marketData.querySellAssess.result[key].min_price.price
+          buy += item.materials[parseInt(key)] * _marketData.queryBuyAssess.result[key].max_price.price
         })
 
         Object.keys(item.materialsManual).forEach((key) => {
-          manual += item.materialsManual[parseInt(key)] * marketData.queryBuyAssess.result[key].max_price.price
+          manual += item.materialsManual[parseInt(key)] * _marketData.queryBuyAssess.result[key].max_price.price
         })
 
         item.buy = buy
@@ -285,9 +309,9 @@ export default function AuctionForm() {
         item.manualPrice = manual
       })
 
-      rawAuctionList.forEach((auctionItem, index) => {
+      rawAuctionList.data.forEach((auctionItem, index) => {
         const matchedCostIndex = matchRule(auctionItem)
-        const fromStartHrs = Math.ceil((new Date().getTime() - new Date(auctionItem.startTime).getTime()) / 1000 / 3600)
+        const fromStartHrs = Math.ceil((new Date().getTime() - (new Date(auctionItem.startTime).getTime() + 8 * 3600 * 1000)) / 1000 / 3600)
 
         const bids: Bids = JSON.parse(localStorage["bids"] || "{}")
 
@@ -300,13 +324,13 @@ export default function AuctionForm() {
             case "手动月矿":
               return items[index].manualPrice
             case "自动月矿":
-              return items[index].buy - marketData.queryBuyAssess.result[81143].max_price.price * 55 - 90000
+              return items[index].buy - _marketData.queryBuyAssess.result[81143].max_price.price * 55 - 90000
           }
         })() * 24 * 90
 
         let price = bid || parseInt(auctionItem.startPrice.replaceAll(",", ""))
         if (auctionItem.auctionInfo.startsWith("当前第二高拍卖价为")) {
-          price = Math.floor((Math.max(bids[auctionItem.id] || 0, price) + 10_000_000) / 10) * 10
+          price = Math.floor((Math.max(bids[auctionItem.id] || 0, price) + 50_000_000) / 10) * 10
         }
 
         auctionItem.costIndex = ((benefit - price) / price)
@@ -316,7 +340,7 @@ export default function AuctionForm() {
         auctionItem.price = price
       })
 
-      setAuctionList(rawAuctionList)
+      setAuctionList(rawAuctionList.data)
     } catch (e) {
       toast({
         title: t("networkError"),
@@ -327,61 +351,85 @@ export default function AuctionForm() {
 
   // useEffect 钩子用于管理拍卖列表更新、轮询和拍卖逻辑
   useEffect(() => {
-    rulesRef.current = rules
-    excludeListRef.current = excludeList
-
     setAuctionList([])
     getAuctionList()
   }, [rules, excludeList])
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setTimeout(getAuctionList, Math.random() * 120)
-    }, 30_000);
+      setTimeout(getAuctionList, Math.random() * 1_500)
+    }, 15_000);
 
     getAuctionList();
 
     return () => clearInterval(interval);
-  }, [token])
+  }, [token, rules, excludeList])
 
   useEffect(() => {
     if (!auctionList.length) return
 
+    let bidFlag = false
+
+    const bidPromises: Promise<void>[] = []
+
     auctionList.forEach(async (item, index) => {
       if (item.costIndex >= item.matchedCi && !item.auctionInfo.startsWith("当前你的公司是最高出价") && item.fromStartHrs >= 24 * 4 - 1) {
-        const bids = JSON.parse(localStorage["bids"] || "{}")
-        toast({
-          title: `${t("bidFor")} ${item.itemName}`,
-          description: `${t("bidPriceIs")} ${item.price.toLocaleString()}`
-        })
-
-        bids[item.id] = item.price
-        localStorage["bids"] = JSON.stringify(bids)
-
-        try {
-          await fetch("https://tools.dc-eve.com/qq/auction/submit", {
-            method: "POST", body: JSON.stringify({
-              id: item.id,
-              price: item.price
-            }), headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-              Cookie: `tools_remember=${token}`
-            }
-          })
-
-          console.warn("++++ bidded", item.itemName, "in region", item.regionName, "cost index", item.costIndex, "/", item.matchedCi)
-        } catch (e) {
-          console.error("---- failed to bid", item.itemName, "in region", item.regionName, "cost index", item.costIndex, "/", item.matchedCi)
+        const bidPromise = (async () => {
+          const bids = JSON.parse(localStorage["bids"] || "{}")
           toast({
-            title: t("networkError"),
-            description: String(e)
+            title: `${t("bidFor")} ${item.itemName}`,
+            description: `${t("bidPriceIs")} ${item.price.toLocaleString()}`
           })
-        }
+
+          bids[item.id] = item.price
+          localStorage["bids"] = JSON.stringify(bids)
+
+          bidFlag = true
+
+          try {
+            await fetch("https://tools.dc-eve.com/qq/auction/submit", {
+              method: "POST", body: JSON.stringify({
+                id: item.id,
+                price: item.price
+              }), headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+                Cookie: `tools_remember=${token}`
+              }
+            })
+
+            console.warn("++++ bidded", item.itemName, "in region", item.regionName, "cost index", item.costIndex, "/", item.matchedCi)
+
+            await sendMail({
+              to: "eduartecliff@gmail.com",
+              name: "Eduarte",
+              subject: `bidded ${item.itemName} for ${item.price}`,
+              body: `bidded ${item.itemName} for ${item.price}`
+            })
+          } catch (e) {
+            console.error("---- failed to bid", item.itemName, "in region", item.regionName, "cost index", item.costIndex, "/", item.matchedCi)
+            toast({
+              title: t("networkError"),
+              description: String(e)
+            })
+          }
+        })()
+
+        bidPromises.push(bidPromise)
       } else {
         // console.log(">>>> skipped", item.itemName, "in region", item.regionName, "cost index", item.costIndex, "/", item.matchedCi)
       }
     })
+
+    if (bidFlag) {
+      Promise.all(bidPromises).then(() => {
+        if (bidPromises.length > 0) {
+          setAuctionList([])
+          getAuctionList()
+        }
+      })
+    }
+
   }, [auctionList])
 
   const rulesForm = useForm<z.infer<typeof RulesFormSchema>>({
