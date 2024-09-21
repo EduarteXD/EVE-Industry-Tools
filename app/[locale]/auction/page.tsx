@@ -13,7 +13,7 @@ export default async function DashBoard() {
   const t = await getTranslations("auction")
 
   return <div className="m-auto px-12">
-    <Card className="max-w-7xl m-auto my-12">
+    <Card className="m-auto my-12">
       <CardHeader>
         <CardTitle>{t("title")}</CardTitle>
       </CardHeader>

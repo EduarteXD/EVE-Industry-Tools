@@ -330,7 +330,16 @@ export default function AuctionForm() {
 
         let price = bid || parseInt(auctionItem.startPrice.replaceAll(",", ""))
         if (auctionItem.auctionInfo.startsWith("当前第二高拍卖价为")) {
-          price = Math.floor((Math.max(bids[auctionItem.id] || 0, price) + 50_000_000) / 10) * 10
+          if (auctionItem.itemCategory === "自动月矿") {
+            price = Math.floor((Math.max(bids[auctionItem.id] || 0, price) + 25_000_000) / 5_000_000) * 5_000_000
+          } else {
+            price = Math.floor((Math.max(bids[auctionItem.id] || 0, price) + 100_000_000) / 10_000_000) * 10_000_000
+          }
+        }
+
+        if (sessionStorage["equalBid"] === String(auctionItem.id)) {
+          price = price + 1
+          sessionStorage["equalBid"] = ""
         }
 
         auctionItem.costIndex = ((benefit - price) / price)
@@ -358,77 +367,87 @@ export default function AuctionForm() {
   useEffect(() => {
     const interval = setInterval(() => {
       setTimeout(getAuctionList, Math.random() * 1_500)
-    }, 15_000);
+    }, 60_000)
 
-    getAuctionList();
+    // getAuctionList();
 
     return () => clearInterval(interval);
+  }, [token, rules, excludeList, auctionList])
+
+  useEffect(() => {
+    getAuctionList()
   }, [token, rules, excludeList])
+
 
   useEffect(() => {
     if (!auctionList.length) return
 
     let bidFlag = false
 
-    const bidPromises: Promise<void>[] = []
+    const bidWithDelay = async (item: any, index: number) => {
+      if (bidFlag) return
+      if (item.costIndex >= item.matchedCi && !item.auctionInfo.startsWith("当前你的公司是最高出价")/* && item.fromStartHrs >= 24 * 4 - 2*/) {
+        bidFlag = true
+        const bids = JSON.parse(localStorage["bids"] || "{}")
+        toast({
+          title: `${t("bidFor")} ${item.itemName}`,
+          description: `${t("bidPriceIs")} ${item.price.toLocaleString()}`
+        })
 
-    auctionList.forEach(async (item, index) => {
-      if (item.costIndex >= item.matchedCi && !item.auctionInfo.startsWith("当前你的公司是最高出价") && item.fromStartHrs >= 24 * 4 - 1) {
-        const bidPromise = (async () => {
-          const bids = JSON.parse(localStorage["bids"] || "{}")
-          toast({
-            title: `${t("bidFor")} ${item.itemName}`,
-            description: `${t("bidPriceIs")} ${item.price.toLocaleString()}`
-          })
+        bids[item.id] = item.price
 
-          bids[item.id] = item.price
+        try {
+          const bidResult = await (await fetch("https://tools.dc-eve.com/qq/auction/submit", {
+            method: "POST", body: JSON.stringify({
+              id: item.id,
+              price: item.price
+            }), headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+              Cookie: `tools_remember=${token}`
+            }
+          })).json()
+
+          console.warn(bidResult)
+
+          if (bidResult.code !== 200 && bidResult.code !== 429) {
+            // bids[item.id] = item.price + 1
+            // localStorage["bids"] = JSON.stringify(bids)
+            sessionStorage["equalBid"] = item.id
+            throw new Error(bidResult.message)
+          }
+
+          if (bidResult.code !== 200) {
+            throw new Error(bidResult.message)
+          }
+
           localStorage["bids"] = JSON.stringify(bids)
 
-          bidFlag = true
-
-          try {
-            await fetch("https://tools.dc-eve.com/qq/auction/submit", {
-              method: "POST", body: JSON.stringify({
-                id: item.id,
-                price: item.price
-              }), headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-                Cookie: `tools_remember=${token}`
-              }
-            })
-
-            console.warn("++++ bidded", item.itemName, "in region", item.regionName, "cost index", item.costIndex, "/", item.matchedCi)
-
-            await sendMail({
-              to: "eduartecliff@gmail.com",
-              name: "Eduarte",
-              subject: `bidded ${item.itemName} for ${item.price}`,
-              body: `bidded ${item.itemName} for ${item.price}`
-            })
-          } catch (e) {
-            console.error("---- failed to bid", item.itemName, "in region", item.regionName, "cost index", item.costIndex, "/", item.matchedCi)
-            toast({
-              title: t("networkError"),
-              description: String(e)
-            })
-          }
-        })()
-
-        bidPromises.push(bidPromise)
-      } else {
-        // console.log(">>>> skipped", item.itemName, "in region", item.regionName, "cost index", item.costIndex, "/", item.matchedCi)
+          console.warn("++++ bidded", item.itemName, "in region", item.regionName, "for", item.price, "with cost index", item.costIndex, "/", item.matchedCi)
+        } catch (e) {
+          await new Promise(resolve => setTimeout(resolve, 3000))
+          toast({
+            title: t("networkError"),
+            description: String(e)
+          })
+        }
       }
-    })
+    }
 
-    if (bidFlag) {
-      Promise.all(bidPromises).then(() => {
-        if (bidPromises.length > 0) {
+    const processBids = async () => {
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      for (let i = 0; i < auctionList.length; i++) {
+        await bidWithDelay(auctionList[i], i)
+        if (bidFlag) {
+          await new Promise(resolve => setTimeout(resolve, 3000))
           setAuctionList([])
           getAuctionList()
+          break
         }
-      })
+      }
     }
+
+    processBids()
 
   }, [auctionList])
 
